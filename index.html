@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ミナと韓国語トーク</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: one-screen voice chat — header with settings, transcript, big start/stop control pinned at the bottom */
+:root {
+  --bg: #f3f5f8; --surface: #ffffff; --ink: #1b2233; --muted: #5d6679; --line: #dde2ea;
+  --accent: #2346a8; --accent-soft: #e5ebfa; --user: #2346a8; --user-ink: #ffffff;
+  --tip-bg: #fff5e6; --tip-ink: #6b4200; --tip-line: #f0c98a;
+  --speak: #ffe28a; --speak-ink: #1b2233; --danger: #b3261e; --live: #0f7b53;
+  --font-display: "Gowun Batang", "Noto Serif KR", serif;
+  --font-ko: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-ja: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11151f; --surface: #1a2030; --ink: #e8ecf5; --muted: #9aa4b8; --line: #2c3447;
+    --accent: #8fa9ff; --accent-soft: #232d48; --user: #3553b8; --user-ink: #ffffff;
+    --tip-bg: #2d2415; --tip-ink: #f3d49c; --tip-line: #5e4a24;
+    --speak: #6a5a1c; --speak-ink: #fff6d6; --danger: #ff8a80; --live: #5fd3a2;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-ja); font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; padding: env(safe-area-inset-top, 0px) 0 0; }
+.app { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 760px; margin: 0 auto; }
+
+header { padding: 12px 16px 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h1 { margin: 0; font-family: var(--font-display); font-size: 1.35rem; text-wrap: balance; }
+h1 span { font-family: var(--font-ja); font-weight: 500; font-size: .8rem; color: var(--muted); margin-left: 6px; }
+.top-btns { display: flex; gap: 6px; }
+.icon-btn { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 4px 10px; font: inherit; font-size: .8rem; cursor: pointer; }
+.icon-btn:hover { color: var(--ink); border-color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: .8rem; color: var(--muted); }
+.controls label { display: flex; align-items: center; gap: 6px; }
+select, input[type=range] { font: inherit; accent-color: var(--accent); }
+select { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { background: var(--surface); color: var(--muted); border: 0; padding: 3px 10px; font: inherit; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.rate-val { font-variant-numeric: tabular-nums; min-width: 2.6em; color: var(--ink); }
+.notice { margin: 0; font-size: .8rem; color: var(--danger); }
+.saved { margin: 0; font-size: .74rem; color: var(--muted); }
+.saved.bad { color: var(--danger); }
+
+main { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.msg { display: flex; flex-direction: column; gap: 6px; max-width: 88%; min-width: 0; }
+.msg.ai { align-self: flex-start; }
+.msg.me { align-self: flex-end; align-items: flex-end; }
+.who { font-size: .72rem; color: var(--muted); letter-spacing: .04em; }
+.bubble { border-radius: 14px; padding: 10px 14px; min-width: 0; overflow-wrap: anywhere; }
+.ai .bubble { background: var(--surface); border: 1px solid var(--line); border-top-left-radius: 4px; }
+.me .bubble { background: var(--user); color: var(--user-ink); border-top-right-radius: 4px; font-family: var(--font-ko); font-size: 1.05rem; }
+.me .bubble.live { background: transparent; color: var(--ink); border: 2px dashed var(--live); }
+.me .bubble.live:empty::before { content: "…"; color: var(--muted); }
+.ko { font-family: var(--font-ko); font-size: 1.12rem; line-height: 1.7; margin: 0; }
+.ko .w { border-radius: 4px; }
+.ko .w.now { background: var(--speak); color: var(--speak-ink); }
+.ja { margin: 6px 0 0; color: var(--muted); font-size: .88rem; }
+.thinking { color: var(--muted); font-size: .9rem; }
+.reveal-hint { display: none; background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-size: .78rem; cursor: pointer; }
+.cap-blur .ai .ko:not(.revealed) { filter: blur(6px); cursor: pointer; user-select: none; }
+.cap-off .ai .ko:not(.revealed) { display: none; }
+.cap-blur .ai .ko:not(.revealed) ~ .reveal-hint, .cap-off .ai .ko:not(.revealed) ~ .reveal-hint { display: inline-block; }
+.cap-blur .ai .ko:not(.revealed) ~ .ja, .cap-off .ai .ko:not(.revealed) ~ .ja { display: none; }
+.hide-ja .ai .ja { display: none !important; }
+.tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.tools button { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 2px 10px; font: inherit; font-size: .75rem; cursor: pointer; }
+.tools button:hover { color: var(--accent); border-color: var(--accent); }
+.tip { background: var(--tip-bg); color: var(--tip-ink); border: 1px solid var(--tip-line); border-radius: 10px; padding: 8px 12px; font-size: .85rem; white-space: pre-wrap; max-width: 100%; }
+.tip b { display: block; font-size: .72rem; letter-spacing: .06em; margin-bottom: 2px; }
+.err { color: var(--danger); font-size: .85rem; margin: 0; }
+
+footer { border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; }
+.status { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: .9rem; color: var(--muted); min-height: 1.6em; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; }
+.status.listening { color: var(--live); font-weight: 700; }
+.status.listening .dot { background: var(--live); animation: pulse 1s ease-in-out infinite; }
+.status.speaking .dot { background: var(--accent); }
+.status.thinking .dot { background: var(--muted); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.6); opacity: .5; } }
+.main-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.big { border: 0; border-radius: 999px; padding: 14px 40px; font: inherit; font-size: 1.1rem; font-weight: 700; cursor: pointer; background: var(--accent); color: var(--bg); min-width: 11em; }
+.big.stop { background: var(--danger); }
+.sub { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 10px 18px; font: inherit; cursor: pointer; }
+.sub[hidden] { display: none; }
+details.typing summary { font-size: .78rem; color: var(--muted); cursor: pointer; text-align: center; }
+.compose { display: flex; gap: 8px; margin-top: 8px; }
+.compose input { flex: 1; min-width: 0; font-family: var(--font-ko); font-size: 1rem; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.compose button { border: 0; border-radius: 10px; padding: 8px 14px; background: var(--accent); color: var(--bg); font: inherit; font-weight: 700; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* setup dialog */
+.setup { position: fixed; inset: 0; background: var(--bg); overflow-y: auto; padding: 32px 16px; z-index: 10; }
+.setup[hidden] { display: none; }
+.hist-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.hist-item { display: flex; gap: 8px; align-items: stretch; }
+.hist-open { flex: 1; min-width: 0; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font: inherit; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.hist-open:hover { border-color: var(--accent); }
+.hist-open.current { border-color: var(--accent); background: var(--accent-soft); }
+.hist-meta { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hist-prev { font-family: var(--font-ko); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-del { background: none; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); font: inherit; font-size: .78rem; padding: 0 10px; cursor: pointer; }
+.hist-del.armed { color: var(--danger); border-color: var(--danger); }
+.setup .card { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.setup h2 { font-family: var(--font-display); margin: 0; font-size: 1.4rem; }
+.setup ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
+.setup a { color: var(--accent); }
+.setup input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 100%; }
+.setup .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.setup .muted { color: var(--muted); font-size: .82rem; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .status .dot { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="top">
+      <h1>미나랑 수다<span>ミナと韓国語トーク</span></h1>
+      <div class="top-btns">
+        <button class="icon-btn" id="resetBtn" type="button">最初から</button>
+        <button class="icon-btn" id="histBtn" type="button">履歴</button>
+        <button class="icon-btn" id="keyBtn" type="button">APIキー</button>
+      </div>
+    </div>
+    <div class="controls">
+      <label>場面
+        <select id="scene">
+          <option value="free">フリートーク</option>
+          <option value="cafe">カフェで注文</option>
+          <option value="shop">買い物（明洞）</option>
+          <option value="travel">旅行・道案内</option>
+          <option value="intro">自己紹介・初対面</option>
+          <option value="fan">推し・K-POPの話</option>
+        </select>
+      </label>
+      <label>速さ <input type="range" id="rate" min="0.5" max="1.3" step="0.1" value="0.9"><span class="rate-val" id="rateVal">0.9×</span></label>
+      <span>字幕
+        <span class="seg" role="group" aria-label="韓国語字幕">
+          <button type="button" data-cap="on" aria-pressed="true">表示</button><button type="button" data-cap="blur" aria-pressed="false">ぼかし</button><button type="button" data-cap="off" aria-pressed="false">なし</button>
+        </span>
+      </span>
+      <label><input type="checkbox" id="showJa" checked> 日本語訳</label>
+    </div>
+    <p class="notice" id="notice" hidden></p>
+    <p class="saved" id="saved" hidden></p>
+  </header>
+
+  <main id="log" aria-live="polite"></main>
+
+  <footer>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">「開始」を押すと会話が始まります</span></div>
+    <div class="main-row">
+      <button class="sub" id="skipBtn" type="button" hidden>読み上げをとばす</button>
+      <button class="big" id="startBtn" type="button">開始</button>
+      <button class="sub" id="doneBtn" type="button" hidden>話し終わった</button>
+    </div>
+    <details class="typing">
+      <summary>文字で入力する</summary>
+      <form class="compose" id="typeForm">
+        <input id="typeInput" type="text" placeholder="한국어로 입력…（日本語でもOK）" autocomplete="off">
+        <button type="submit">送信</button>
+      </form>
+    </details>
+  </footer>
+</div>
+
+<div class="setup" id="history" hidden>
+  <div class="card">
+    <div class="top"><h2>トーク履歴</h2><button class="icon-btn" id="histClose" type="button">閉じる</button></div>
+    <p class="muted">タップするとその会話を開きます。「開始」を押せば続きから話せます。</p>
+    <ul class="hist-list" id="histList"></ul>
+    <p class="muted" id="histEmpty" hidden>まだ履歴がありません。ミナと話すと、ここに会話が並びます。</p>
+    <button class="sub" id="histNew" type="button">新しい会話を始める</button>
+  </div>
+</div>
+
+<div class="setup" id="setup" hidden>
+  <div class="card">
+    <h2>はじめに：Geminiの無料キーを設定</h2>
+    <p>ミナの会話にはGoogleのAI「Gemini」を使います。無料のキーを一度だけ設定してください。</p>
+    <ol>
+      <li><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio のAPIキーページ</a>を開き、Googleアカウントでログイン</li>
+      <li>「APIキーを作成（Create API key）」を押す</li>
+      <li>表示されたキー（AQ. または AIza で始まる文字列）をコピーして、下に貼り付け</li>
+    </ol>
+    <input id="keyInput" type="password" placeholder="AQ.…" autocomplete="off" spellcheck="false">
+    <label class="muted">モデル
+      <select id="model">
+        <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite（速い・おすすめ）</option>
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash（賢いが少し遅い）</option>
+      </select>
+    </label>
+    <div class="row">
+      <button class="big" id="keySave" type="button">保存して始める</button>
+      <button class="sub" id="keyCancel" type="button">閉じる</button>
+    </div>
+    <p class="err" id="keyErr" hidden></p>
+    <p class="muted">キーはこのブラウザの中にだけ保存され、Googleとの通信以外には使いません。他の人に見せないでください。</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const OPENERS = {
+    free:   { ko: "안녕하세요! 저는 미나예요. 오늘 하루 어땠어요?", ja: "こんにちは！ミナです。今日はどんな一日でしたか？" },
+    cafe:   { ko: "어서 오세요! 주문하시겠어요?", ja: "いらっしゃいませ！ご注文はお決まりですか？" },
+    shop:   { ko: "안녕하세요~ 천천히 구경하세요. 뭐 찾으시는 거 있어요?", ja: "こんにちは〜ごゆっくりご覧ください。何かお探しですか？" },
+    travel: { ko: "안녕하세요! 한국 여행 오셨어요? 어디 가고 싶으세요?", ja: "こんにちは！韓国旅行ですか？どこに行きたいですか？" },
+    intro:  { ko: "처음 뵙겠습니다. 저는 미나라고 해요. 이름이 뭐예요?", ja: "はじめまして。ミナといいます。お名前は何ですか？" },
+    fan:    { ko: "저 요즘 K-POP에 푹 빠졌어요! 좋아하는 가수 있어요?", ja: "私、最近K-POPにハマってるんです！好きな歌手はいますか？" },
+  };
+  const SCENE_DESC = {
+    free: "自由な雑談。ミナはソウルに住む20代の会社員で、友達のように話す。",
+    cafe: "ソウルのカフェ。ミナは店員、ユーザーは客。注文・サイズ・支払いなどの会話。",
+    shop: "明洞の化粧品店や服屋。ミナは店員、ユーザーは客。値段・色・サイズ・おすすめなど。",
+    travel: "韓国旅行中。ミナは親切な地元の人。道案内・交通・観光地・食べ物の話。",
+    intro: "初対面の自己紹介。ミナは同年代の韓国人。名前・仕事・趣味・出身などを話す。",
+    fan: "K-POPや韓国ドラマのファン同士の雑談。ミナは明るいファン。",
+  };
+  const rules = (scene) => `あなたは韓国語会話の練習相手「ミナ」です。
+ユーザーは日本人の韓国語学習者です。チャットならある程度書けますが、聞き取りと会話（スピーキング）を鍛えたいと思っています。ユーザーの発言は音声認識の結果なので、分かち書きや綴りの誤認識が混じることがあります。意味を汲み取って会話してください。
+
+場面: ${SCENE_DESC[scene]}
+
+ルール:
+- 自然な話し言葉の韓国語（해요体中心）で、1〜3文の短い返事をする。読み上げて聞き取る練習なので長くしない。
+- 会話が続くよう、最後に質問を1つ入れる。
+- 中級学習者に合う語彙を使い、難しすぎる表現は避ける。
+- ユーザーの韓国語に文法の誤りや不自然な点があれば、TIPに日本語で簡潔に指摘し、自然な言い方の例を示す。音声認識による分かち書きや綴りのズレは指摘しない。問題がなければTIPは書かない。
+- ユーザーが日本語で話した場合は、それを韓国語でどう言うかをTIPで教え、会話は韓国語で続ける。
+
+出力形式（この形式だけを出力。他の文字や記号は書かない）:
+KO: 韓国語の返事
+JA: その日本語訳
+TIP: 訂正やアドバイス（必要な時だけ）`;
+
+  const $ = (id) => document.getElementById(id);
+  const app = $("app"), log = $("log");
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  let state = Object.assign({ scene: "free", rate: 0.9, cap: "on", showJa: true, turns: [] }, store.get("mina-app", {}));
+  let apiKey = store.get("mina-key", "");
+  let model = store.get("mina-model", "gemini-3.5-flash-lite");
+  const save = () => store.set("mina-app", state);
+
+  function showNotice(t) { $("notice").textContent = t; $("notice").hidden = !t; }
+  function setStatus(kind, text) { $("status").className = "status " + (kind || ""); $("statusText").textContent = text; }
+
+  // ---------- parse "KO: / JA: / TIP:"
+  function parse(text) {
+    const out = { ko: "", ja: "", tip: "" };
+    let key = null;
+    for (const raw of text.split("\n")) {
+      const m = raw.match(/^\s*\**\s*(KO|JA|TIP)\s*\**\s*[:：]\s*(.*)$/i);
+      if (m) { key = m[1].toLowerCase(); out[key] += (out[key] ? "\n" : "") + m[2]; }
+      else if (key && raw.trim()) out[key] += "\n" + raw.trim();
+    }
+    if (!out.ko && !out.ja && !out.tip) out.ko = text.trim();
+    for (const k in out) out[k] = out[k].trim();
+    return out;
+  }
+
+  // ---------- speech synthesis
+  const synth = window.speechSynthesis;
+  let koVoice = null;
+  function pickVoice() {
+    if (!synth) return;
+    const vs = synth.getVoices().filter(v => /^ko/i.test(v.lang));
+    koVoice = vs.find(v => /yuna|sora|google|premium|enhanced/i.test(v.name)) || vs[0] || null;
+  }
+  if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
+  setTimeout(() => { if (synth && !koVoice) showNotice("韓国語の読み上げ音声が見つかりません。Macの「システム設定 > アクセシビリティ > 読み上げコンテンツ > システムの声」で韓国語の声を追加してください。"); }, 1500);
+
+  let speakingEl = null;
+  function clearSpeaking() { if (speakingEl) speakingEl.querySelectorAll(".now").forEach(w => w.classList.remove("now")); speakingEl = null; }
+  function speak(text, koEl, rate) {
+    return new Promise((resolve) => {
+      if (!synth || !text) return resolve();
+      synth.cancel(); clearSpeaking();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "ko-KR"; if (koVoice) u.voice = koVoice;
+      u.rate = rate || state.rate;
+      speakingEl = koEl;
+      const words = koEl ? [...koEl.querySelectorAll(".w")] : [];
+      u.onboundary = (e) => {
+        if (!words.length) return;
+        let cur = words[0];
+        for (const w of words) if (+w.dataset.i <= e.charIndex) cur = w;
+        words.forEach(w => w.classList.toggle("now", w === cur));
+      };
+      let done = false;
+      const fin = () => { if (done) return; done = true; clearSpeaking(); resolve(); };
+      u.onend = u.onerror = fin;
+      synth.speak(u);
+      // Safari sometimes never fires onend
+      const guard = setInterval(() => { if (!synth.speaking && !synth.pending) { clearInterval(guard); fin(); } }, 400);
+    });
+  }
+
+  // ---------- rendering
+  function fillKo(el, text) {
+    el.textContent = "";
+    let i = 0;
+    for (const part of text.split(/(\s+)/)) {
+      if (!part) continue;
+      if (/^\s+$/.test(part)) el.append(part);
+      else { const s = document.createElement("span"); s.className = "w"; s.dataset.i = i; s.textContent = part; el.append(s); }
+      i += part.length;
+    }
+  }
+  function aiMessage() {
+    const wrap = document.createElement("div"); wrap.className = "msg ai";
+    wrap.innerHTML = `<span class="who">ミナ</span><div class="bubble"><p class="ko"></p><button type="button" class="reveal-hint">タップで字幕を表示</button><p class="ja"></p></div>
+      <div class="tools"><button type="button" data-act="play">▶ もう一度</button><button type="button" data-act="slow">ゆっくり再生</button></div>`;
+    const ko = wrap.querySelector(".ko"), ja = wrap.querySelector(".ja");
+    const reveal = () => ko.classList.add("revealed");
+    ko.addEventListener("click", reveal);
+    wrap.querySelector(".reveal-hint").addEventListener("click", reveal);
+    wrap.querySelector("[data-act=play]").addEventListener("click", () => replay(wrap.dataset.ko, ko));
+    wrap.querySelector("[data-act=slow]").addEventListener("click", () => replay(wrap.dataset.ko, ko, 0.6));
+    log.append(wrap);
+    return { wrap, ko, set(p) { wrap.dataset.ko = p.ko; fillKo(ko, p.ko); ja.textContent = p.ja; } };
+  }
+  function tipBox(text) {
+    const d = document.createElement("div"); d.className = "tip";
+    const b = document.createElement("b"); b.textContent = "ワンポイント";
+    d.append(b, text); return d;
+  }
+  function meMessage(text, tip) {
+    const wrap = document.createElement("div"); wrap.className = "msg me";
+    wrap.innerHTML = `<span class="who">あなた</span><div class="bubble"></div>`;
+    wrap.querySelector(".bubble").textContent = text;
+    if (tip) wrap.append(tipBox(tip));
+    log.append(wrap); return wrap;
+  }
+  const scrollDown = () => { log.scrollTop = log.scrollHeight; };
+  let openerMsg = null;
+  function renderAll() {
+    log.textContent = "";
+    openerMsg = aiMessage(); openerMsg.set(OPENERS[state.scene]);
+    for (let i = 0; i < state.turns.length; i++) {
+      const t = state.turns[i];
+      if (t.role === "user") {
+        const next = state.turns[i + 1];
+        meMessage(t.content, next && next.role === "assistant" ? parse(next.content).tip : "");
+      } else aiMessage().set(parse(t.content));
+    }
+    scrollDown();
+  }
+  function applySettings() {
+    app.classList.toggle("cap-blur", state.cap === "blur");
+    app.classList.toggle("cap-off", state.cap === "off");
+    app.classList.toggle("hide-ja", !state.showJa);
+    document.querySelectorAll("[data-cap]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.cap === state.cap)));
+    $("scene").value = state.scene; $("rate").value = state.rate; $("rateVal").textContent = Number(state.rate).toFixed(1) + "×";
+    $("showJa").checked = state.showJa;
+  }
+
+  // ---------- Gemini
+  async function askGemini(onText, signal) {
+    const contents = [{ role: "user", parts: [{ text: "（会話を始めてください）" }] },
+      { role: "model", parts: [{ text: `KO: ${OPENERS[state.scene].ko}\nJA: ${OPENERS[state.scene].ja}` }] },
+      ...state.turns.slice(-30).map(t => ({ role: t.role === "assistant" ? "model" : "user", parts: [{ text: t.content }] }))];
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
+      method: "POST", signal,
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: rules(state.scene) }] }, contents, generationConfig: { temperature: 0.9, maxOutputTokens: 1024 } }),
+    });
+    if (!res.ok) {
+      let msg = ""; try { msg = (await res.json()).error?.message || ""; } catch {}
+      const err = new Error(msg); err.status = res.status; throw err;
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "", text = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n"); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
+        try {
+          const j = JSON.parse(line.slice(5));
+          for (const p of j.candidates?.[0]?.content?.parts || []) if (p.text && !p.thought) { text += p.text; onText(text); }
+        } catch {}
+      }
+    }
+    if (!text.trim()) throw Object.assign(new Error("empty"), { status: 0 });
+    return text;
+  }
+  function geminiError(e) {
+    if (e.status === 400 && /key/i.test(e.message)) return "APIキーが正しくないようです。右上の「APIキー」から設定し直してください。";
+    if (e.status === 401 || e.status === 403) return "APIキーが使えません。右上の「APIキー」から設定し直してください。";
+    if (e.status === 404) return "選んだモデルが使えません。右上の「APIキー」からモデルを変えてください。";
+    if (e.status === 429) return "無料枠の上限に達しました。少し時間をおいてから再開してください。";
+    return "通信に失敗しました。ネット接続を確認して、もう一度話してください。";
+  }
+
+  // ---------- speech recognition
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) showNotice("このブラウザは音声認識に対応していません。Chrome または Safari で開いてください。");
+
+  let running = false, rec = null, liveMsg = null, silenceTimer = null, ctl = null, emptyTries = 0;
+  const SILENCE_MS = 1600;
+
+  function listen() {
+    if (!running || !SR) return;
+    liveMsg = meMessage("", ""); liveMsg.querySelector(".bubble").classList.add("live");
+    scrollDown();
+    setStatus("listening", "あなたの番です。韓国語で話してください");
+    $("doneBtn").hidden = false; $("skipBtn").hidden = true;
+    let finalText = "", interim = "";
+    rec = new SR();
+    rec.lang = "ko-KR"; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
+    rec.onresult = (e) => {
+      interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
+      }
+      liveMsg.querySelector(".bubble").textContent = (finalText + interim).trim();
+      scrollDown();
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => { try { rec.stop(); } catch {} }, SILENCE_MS);
+    };
+    rec.onerror = (e) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        showNotice("マイクが許可されていません。PCはアドレスバー左のアイコン（サイト設定）から、iPhoneは「設定 > アプリ > Safari > マイク」から、このページのマイクを「許可」にしてください。");
+        stop();
+      } else if (e.error === "network") {
+        showNotice("音声認識の通信に失敗しました。ネット接続を確認してください。");
+      }
+    };
+    rec.onend = () => {
+      clearTimeout(silenceTimer);
+      $("doneBtn").hidden = true;
+      const text = (finalText + interim).trim();
+      rec = null;
+      if (!running) { if (liveMsg && !text) liveMsg.remove(); return; }
+      if (!text) {
+        liveMsg.remove(); liveMsg = null;
+        if (++emptyTries >= 4) { setStatus("", "聞き取れませんでした。「再開」を押すと続きから話せます"); pause(); return; }
+        return listen();
+      }
+      emptyTries = 0;
+      const b = liveMsg.querySelector(".bubble"); b.classList.remove("live"); b.textContent = text;
+      reply(text, liveMsg);
+    };
+    try { rec.start(); } catch { setTimeout(listen, 300); }
+  }
+
+  async function reply(text, meEl) {
+    state.turns.push({ role: "user", content: text });
+    const ai = aiMessage();
+    ai.ko.classList.add("revealed");
+    ai.ko.innerHTML = '<span class="thinking">考え中…</span>';
+    setStatus("thinking", "ミナが考えています…");
+    scrollDown();
+    ctl = new AbortController();
+    try {
+      const raw = await askGemini((t) => { ai.set(parse(t)); if (state.cap !== "on") ai.ko.classList.remove("revealed"); scrollDown(); }, ctl.signal);
+      const p = parse(raw);
+      ai.set(p);
+      if (state.cap !== "on") ai.ko.classList.remove("revealed");
+      if (p.tip) meEl.append(tipBox(p.tip));
+      state.turns.push({ role: "assistant", content: raw }); save(); saveHistory();
+      scrollDown();
+      ctl = null;
+      if (!running) return;
+      await say(p.ko, ai.ko);
+      listen();
+    } catch (e) {
+      ctl = null;
+      state.turns.pop(); ai.wrap.remove();
+      if (e.name === "AbortError") { meEl.remove(); return; }
+      const d = document.createElement("p"); d.className = "err"; d.textContent = geminiError(e);
+      meEl.append(d); scrollDown();
+      if (running) { setStatus("", "エラーで止まりました"); pause(); }
+    }
+  }
+
+  async function say(text, koEl, rate) {
+    setStatus("speaking", "ミナが話しています…");
+    $("skipBtn").hidden = false;
+    await speak(text, koEl, rate);
+    $("skipBtn").hidden = true;
+  }
+  function cancelListen() {
+    if (!rec) return;
+    const r = rec; rec = null; r.onend = null; r.onresult = null;
+    try { r.abort(); } catch {}
+    clearTimeout(silenceTimer);
+    if (liveMsg) { liveMsg.remove(); liveMsg = null; }
+    $("doneBtn").hidden = true;
+  }
+  async function replay(text, koEl, rate) {
+    if (ctl) return;
+    cancelListen();
+    await say(text, koEl, rate);
+    if (running) listen(); else setStatus("", "「開始」を押すと会話が続きます");
+  }
+
+  // ---------- talk history
+  // On the Mac (opened via ミナを起動.command) server.rb saves to the vault's トーク履歴/.
+  // Anywhere else (iPhone / web) sessions are kept in this browser's storage.
+  const pad = (n) => String(n).padStart(2, "0");
+  function newSession() {
+    const d = new Date();
+    const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    return { id: `${day}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`, started: `${day} ${pad(d.getHours())}:${pad(d.getMinutes())}` };
+  }
+  const serverReady = fetch("/api/ping").then(r => r.ok ? r.json() : null).then(j => !!(j && j.ok)).catch(() => false);
+  const localHist = {
+    all() { return store.get("mina-sessions", {}); },
+    async list() {
+      return Object.values(this.all()).map(d => {
+        const first = (d.raw || []).find(t => t.role === "user");
+        return { id: d.id, started: d.started, scene: d.scene, count: (d.raw || []).filter(t => t.role === "user").length, preview: first ? first.content.slice(0, 40) : "" };
+      }).sort((x, y) => (x.id < y.id ? 1 : -1));
+    },
+    async get(id) { return this.all()[id]; },
+    async put(d) { const a = this.all(); a[d.id] = { id: d.id, started: d.started, scene: d.scene, raw: d.raw }; store.set("mina-sessions", a); return "この端末に保存中"; },
+    async del(id) { const a = this.all(); delete a[id]; store.set("mina-sessions", a); },
+  };
+  const serverHist = {
+    async list() { return (await fetch("/api/sessions")).json(); },
+    async get(id) { return (await fetch("/api/session?id=" + encodeURIComponent(id))).json(); },
+    async put(d) {
+      const j = await (await fetch("/api/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) })).json();
+      if (!j.ok) throw new Error(j.error);
+      return "保存中：" + j.file;
+    },
+    async del(id) { await fetch("/api/delete?id=" + encodeURIComponent(id), { method: "POST" }); },
+  };
+  const hist = async () => (await serverReady) ? serverHist : localHist;
+
+  function showSaved(text, bad) { const el = $("saved"); el.textContent = "履歴を" + text; el.classList.toggle("bad", !!bad); el.hidden = false; }
+  async function saveHistory() {
+    if (!state.session) { state.session = newSession(); save(); }
+    const turns = [{ role: "assistant", ...OPENERS[state.scene] }];
+    state.turns.forEach((t, i) => {
+      if (t.role === "assistant") { const p = parse(t.content); turns.push({ role: "assistant", ko: p.ko, ja: p.ja }); }
+      else {
+        const next = state.turns[i + 1];
+        turns.push({ role: "user", text: t.content, tip: next && next.role === "assistant" ? parse(next.content).tip : "" });
+      }
+    });
+    try { showSaved(await (await hist()).put({ id: state.session.id, started: state.session.started, scene: state.scene, turns, raw: state.turns })); }
+    catch { showSaved("保存できませんでした", true); }
+  }
+
+  // ---------- start / stop
+  function setStartBtn() {
+    const b = $("startBtn");
+    b.textContent = running ? "停止" : (state.turns.length ? "再開" : "開始");
+    b.classList.toggle("stop", running);
+  }
+  async function start() {
+    if (!apiKey) { openSetup(); return; }
+    if (!SR) return;
+    showNotice("");
+    running = true; emptyTries = 0; setStartBtn();
+    if (synth && state.turns.length) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; synth.speak(u); } // iPhone: allow later speech
+    if (state.turns.length === 0) { await say(OPENERS[state.scene].ko, openerMsg.ko); }
+    else {
+      const last = state.turns[state.turns.length - 1];
+      if (last.role === "user") { state.turns.pop(); renderAll(); }
+    }
+    if (running) listen();
+  }
+  function stop() {
+    running = false;
+    cancelListen();
+    if (ctl) ctl.abort();
+    synth?.cancel();
+    $("skipBtn").hidden = true; $("doneBtn").hidden = true;
+    setStartBtn();
+    setStatus("", "止めました。「再開」で続きから話せます");
+  }
+  function pause() { running = false; $("skipBtn").hidden = true; $("doneBtn").hidden = true; setStartBtn(); }
+
+  $("startBtn").addEventListener("click", () => running ? stop() : start());
+  $("skipBtn").addEventListener("click", () => synth?.cancel());
+  $("doneBtn").addEventListener("click", () => { if (rec) try { rec.stop(); } catch {} });
+  $("typeForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const t = $("typeInput").value.trim();
+    if (!t || ctl) return;
+    if (!apiKey) { openSetup(); return; }
+    $("typeInput").value = "";
+    cancelListen(); synth?.cancel();
+    if (!running) { running = true; setStartBtn(); }
+    reply(t, meMessage(t, ""));
+  });
+
+  // ---------- settings
+  function resetConv() { stop(); state.turns = []; state.session = null; save(); $("saved").hidden = true; renderAll(); setStartBtn(); setStatus("", "「開始」を押すと会話が始まります"); }
+  $("scene").addEventListener("change", (e) => { state.scene = e.target.value; resetConv(); });
+  $("resetBtn").addEventListener("click", resetConv);
+  $("rate").addEventListener("input", (e) => { state.rate = +e.target.value; $("rateVal").textContent = state.rate.toFixed(1) + "×"; save(); });
+  document.querySelectorAll("[data-cap]").forEach(b => b.addEventListener("click", () => {
+    state.cap = b.dataset.cap;
+    document.querySelectorAll(".ko.revealed").forEach(k => k.classList.remove("revealed"));
+    applySettings(); save();
+  }));
+  $("showJa").addEventListener("change", (e) => { state.showJa = e.target.checked; applySettings(); save(); });
+
+  // ---------- API key setup
+  // ---------- history panel
+  const SCENE_NAME = { free: "フリートーク", cafe: "カフェで注文", shop: "買い物", travel: "旅行・道案内", intro: "自己紹介", fan: "推し・K-POP" };
+  async function openHistory() {
+    stop();
+    const list = $("histList"); list.textContent = "";
+    $("history").hidden = false;
+    let items = [];
+    try { items = await (await hist()).list(); }
+    catch { $("histEmpty").textContent = "履歴を読み込めませんでした。"; $("histEmpty").hidden = false; return; }
+    $("histEmpty").textContent = "まだ履歴がありません。ミナと話すと、ここに会話が並びます。";
+    $("histEmpty").hidden = items.length > 0;
+    for (const it of items) {
+      const li = document.createElement("li"); li.className = "hist-item";
+      const open = document.createElement("button"); open.type = "button";
+      open.className = "hist-open" + (state.session && state.session.id === it.id ? " current" : "");
+      const meta = document.createElement("span"); meta.className = "hist-meta";
+      meta.textContent = `${it.started}　${SCENE_NAME[it.scene] || ""}　${it.count}往復`;
+      const prev = document.createElement("span"); prev.className = "hist-prev"; prev.textContent = it.preview || "（発言なし）";
+      open.append(meta, prev);
+      open.addEventListener("click", () => loadSession(it.id));
+      const del = document.createElement("button"); del.type = "button"; del.className = "hist-del"; del.textContent = "削除";
+      del.addEventListener("click", async () => {
+        if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "本当に削除"; setTimeout(() => { del.classList.remove("armed"); del.textContent = "削除"; }, 3000); return; }
+        await (await hist()).del(it.id);
+        if (state.session && state.session.id === it.id) { state.turns = []; state.session = null; save(); renderAll(); setStartBtn(); $("saved").hidden = true; }
+        openHistory();
+      });
+      li.append(open, del); list.append(li);
+    }
+  }
+  async function loadSession(id) {
+    try {
+      const d = await (await hist()).get(id);
+      if (!d) throw new Error("not found");
+      state.scene = OPENERS[d.scene] ? d.scene : "free";
+      state.turns = Array.isArray(d.raw) ? d.raw : [];
+      state.session = { id: d.id, started: d.started };
+      save(); applySettings(); renderAll(); setStartBtn();
+      setStatus("", "「再開」を押すと、この会話の続きから話せます");
+      $("saved").hidden = true;
+      $("history").hidden = true;
+    } catch { showNotice("この会話を開けませんでした。"); }
+  }
+  $("histBtn").addEventListener("click", openHistory);
+  $("histClose").addEventListener("click", () => { $("history").hidden = true; });
+  $("histNew").addEventListener("click", () => { $("history").hidden = true; resetConv(); });
+  function openSetup() { $("keyInput").value = apiKey; $("model").value = model; $("keyErr").hidden = true; $("setup").hidden = false; $("keyInput").focus(); }
+  $("keyBtn").addEventListener("click", () => { stop(); openSetup(); });
+  $("keyCancel").addEventListener("click", () => { $("setup").hidden = true; });
+  $("keySave").addEventListener("click", () => {
+    const k = $("keyInput").value.trim();
+    if (!/^(AIza|AQ\.)[\w.-]{20,}$/.test(k)) { $("keyErr").textContent = "キーの形式が違うようです。「AQ.」または「AIza」で始まる文字列を丸ごと貼り付けてください。"; $("keyErr").hidden = false; return; }
+    apiKey = k; model = $("model").value;
+    store.set("mina-key", apiKey); store.set("mina-model", model);
+    $("setup").hidden = true;
+    start();
+  });
+
+  applySettings();
+  renderAll();
+  setStartBtn();
+  if (!apiKey) openSetup();
+})();
+</script>
+</body>
+</html>
