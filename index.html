@@ -247,6 +247,7 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
 .me .pron { align-self: flex-end; }
 
 /* ---------- report */
+.rep-body { display: flex; flex-direction: column; gap: 12px; }
 .rep-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .rep-card h3 { margin: 0; font-size: .82rem; color: var(--muted); font-weight: 700; letter-spacing: .04em; }
 .rep-summary { margin: 0; font-size: .9rem; }
@@ -356,7 +357,7 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
   <div class="drawer-head"><span class="brand">한국어 수다</span><button class="close-x" id="menuClose" type="button" aria-label="メニューを閉じる">×</button></div>
   <nav>
     <button type="button" id="vocBtn"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/><path d="M9 7h6"/></svg></span><strong>単語帳</strong><small>タップした単語の復習と練習</small></button>
-    <button type="button" id="reportNav"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M10 12h6M10 16h4"/></svg></span><strong>ふりかえり</strong><small>今日の会話のレポート</small></button>
+    <button type="button" id="reportNav"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M10 12h6M10 16h4"/></svg></span><strong>ふりかえり</strong><small>会話ごとのレポート（過去の分も）</small></button>
     <button type="button" id="calNav"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></span><strong>記録カレンダー</strong><small id="calNavSub">連続記録と毎日の目標</small></button>
     <button type="button" id="histBtn"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L4 20l1.4-4.4A7.5 7.5 0 1 1 20 12z"/></svg></span><strong>トーク履歴</strong><small>前の会話を見る・つづける</small></button>
     <button type="button" id="setBtn"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span><strong>設定</strong><small>話す相手・声・場面・速さ</small></button>
@@ -439,7 +440,8 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
 <div class="setup" id="report" hidden>
   <div class="card">
     <div class="top"><h2>ふりかえり</h2><button class="icon-btn" id="reportClose" type="button">閉じる</button></div>
-    <div id="reportBody" class="card"></div>
+    <div id="reportBody" class="rep-body"></div>
+    <div class="rep-card" id="reportPast" hidden><h3>これまでのふりかえり</h3><div id="reportPastList" class="hist-list"></div></div>
   </div>
 </div>
 
@@ -1056,7 +1058,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     async list() {
       return Object.values(this.all()).map(d => {
         const first = (d.raw || []).find(t => t.role === "user");
-        return { id: d.id, started: d.started, scene: d.scene, char: d.char, count: (d.raw || []).filter(t => t.role === "user").length, preview: first ? first.content.slice(0, 40) : "" };
+        return { id: d.id, started: d.started, scene: d.scene, char: d.char, count: (d.raw || []).filter(t => t.role === "user").length, preview: first ? first.content.slice(0, 40) : "", hasReport: !!d.report, summary: d.report?.summary ? String(d.report.summary).slice(0, 80) : "" };
       }).sort((x, y) => (x.id < y.id ? 1 : -1));
     },
     async get(id) { return this.all()[id]; },
@@ -1431,6 +1433,7 @@ ${convoText(10)}`);
   async function openReport() {
     stop();
     $("report").hidden = false;
+    renderPastReports();
     const body = $("reportBody");
     if (userTurns() < 2) { body.innerHTML = '<p class="muted">2回以上おしゃべりすると、ふりかえりレポートが作れるよ</p>'; return; }
     if (state.session?.report && state.session.reportTurns === state.turns.length) { renderReport(state.session.report); return; }
@@ -1461,23 +1464,46 @@ ${convoText(40)}`);
       $("repRetry").onclick = openReport;
     }
   }
+  async function renderPastReports() {
+    const wrap = $("reportPast"), list = $("reportPastList");
+    let items = [];
+    try { items = (await (await hist()).list()).filter(it => it.hasReport && it.id !== state.session?.id); } catch {}
+    wrap.hidden = !items.length; list.textContent = "";
+    for (const it of items) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "hist-open";
+      const meta = document.createElement("span"); meta.className = "hist-meta";
+      meta.textContent = `${it.started}　${(CHARS[it.char] || CHARS.mina).name}　${SCENE_NAME[it.scene] || ""}`;
+      const sum = document.createElement("span"); sum.className = "hist-prev"; sum.textContent = it.summary || "（まとめなし）";
+      b.append(meta, sum);
+      b.onclick = async () => {
+        try {
+          const d = await (await hist()).get(it.id);
+          if (!d?.report) return;
+          renderReport(d.report, `${d.started}・${(CHARS[d.char] || CHARS.mina).name}との会話`);
+          $("report").scrollTop = 0;
+        } catch {}
+      };
+      list.append(b);
+    }
+  }
   const dots = (n) => { n = Math.max(0, Math.min(5, Math.round(+n || 0))); return "●".repeat(n) + "○".repeat(5 - n); };
   function addVocabFrom(word, meaning, sentence, sentenceJa) {
     if (findVocab(word)) return;
     vocab.unshift({ id: Date.now() + "_" + Math.random().toString(36).slice(2, 6), word, base: "", meaning, note: "", sentence: sentence || "", sentenceJa: sentenceJa || "", added: today(), ok: 0, ng: 0 });
     saveVocab(); markWords();
   }
-  function renderReport(r) {
+  function renderReport(r, label) {
     const body = $("reportBody"), arr = (x) => Array.isArray(x) ? x : [];
     const sc = r.scores || {};
-    body.innerHTML = `
-      <div class="rep-card"><h3>今日のまとめ</h3><p class="rep-summary">${esc(r.summary || "")}</p>
+    body.innerHTML = `${label ? `<div class="row" style="justify-content:space-between;align-items:center"><span class="muted">${esc(label)}</span><button class="mini" type="button" id="repBack">今の会話にもどる</button></div>` : ""}
+      <div class="rep-card"><h3>まとめ</h3><p class="rep-summary">${esc(r.summary || "")}</p>
         <div class="rep-scores"><div><b>${dots(sc.grammar)}</b>文法</div><div><b>${dots(sc.vocab)}</b>語彙</div><div><b>${dots(sc.flow)}</b>会話の流れ</div></div></div>
       ${arr(r.good).length ? `<div class="rep-card"><h3>よかったところ</h3><ul class="rep-list">${arr(r.good).map(g => `<li>${esc(g)}</li>`).join("")}</ul></div>` : ""}
       ${arr(r.fixes).length ? `<div class="rep-card"><h3>もっと自然に言うと</h3>${arr(r.fixes).map((x, i) => `<div class="rep-fix"><span class="rep-you">${esc(x.you || "")}</span><span class="rep-better">${esc(x.better || "")}</span><span class="rep-why">${esc(x.why || "")}</span><div class="row"><button class="mini" type="button" data-play="${esc(x.better || "")}">▶ 聞く</button></div></div>`).join("")}</div>` : ""}
       ${arr(r.phrases).length ? `<div class="rep-card"><h3>覚えたい表現</h3>${arr(r.phrases).map((p, i) => `<div class="rep-item"><div class="t"><span class="k">${esc(p.ko || "")}</span><span class="j">${esc(p.ja || "")}</span></div><button class="mini" type="button" data-play="${esc(p.ko || "")}">▶</button><button class="mini" type="button" data-add="p${i}">＋単語帳</button></div>`).join("")}</div>` : ""}
       ${arr(r.words).length ? `<div class="rep-card"><h3>覚えたい単語</h3>${arr(r.words).map((w, i) => `<div class="rep-item"><div class="t"><span class="k">${esc(w.word || "")}</span><span class="j">${esc(w.meaning || "")}</span></div><button class="mini" type="button" data-play="${esc(w.word || "")}">▶</button><button class="mini" type="button" data-add="w${i}">＋単語帳</button></div>`).join("")}</div>` : ""}
       ${r.next ? `<div class="rep-next"><b>次の目標</b><br>${esc(r.next)}</div>` : ""}`;
+    $("repBack")?.addEventListener("click", openReport);
     body.querySelectorAll("[data-play]").forEach(b => b.onclick = () => speakPlain(b.dataset.play));
     body.querySelectorAll("[data-add]").forEach(b => {
       const k = b.dataset.add, item = k[0] === "p" ? arr(r.phrases)[+k.slice(1)] : arr(r.words)[+k.slice(1)];
@@ -1912,7 +1938,7 @@ ${convoText(12)}
       const open = document.createElement("button"); open.type = "button";
       open.className = "hist-open" + (state.session && state.session.id === it.id ? " current" : "");
       const meta = document.createElement("span"); meta.className = "hist-meta";
-      meta.textContent = `${it.started}　${(CHARS[it.char] || CHARS.mina).name}　${SCENE_NAME[it.scene] || ""}　${it.count}往復`;
+      meta.textContent = `${it.started}　${(CHARS[it.char] || CHARS.mina).name}　${SCENE_NAME[it.scene] || ""}　${it.count}往復${it.hasReport ? "・ふりかえりあり" : ""}`;
       const prev = document.createElement("span"); prev.className = "hist-prev"; prev.textContent = it.preview || "（発言なし）";
       open.append(meta, prev);
       open.addEventListener("click", () => loadSession(it.id));
