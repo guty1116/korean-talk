@@ -380,6 +380,18 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
           <option value="halmoni">スンジャさん（70代女性・食堂のおばあちゃん）</option>
         </select>
       </label>
+      <label>会話モード
+        <select id="convMode">
+          <option value="live">リアルタイム（Gemini Live・おすすめ）</option>
+          <option value="classic">ふつう（聞き取り → 返事 → 読み上げ）</option>
+        </select>
+      </label>
+      <label>読み上げ音声（ふつうモード・再生ボタン）
+        <select id="ttsEngine">
+          <option value="ai">AI音声（自然でなめらか・おすすめ）</option>
+          <option value="device">端末の音声（すぐ再生・回数制限なし）</option>
+        </select>
+      </label>
       <label>声
         <select id="voice"><option value="">おまかせ</option></select>
       </label>
@@ -572,6 +584,7 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
 - 相手の返事が短くなったり話題が尽きそうなら、関連する別の話題（食べ物、旅行、ドラマ、音楽、仕事、趣味、季節の行事、韓国の文化や流行など）へ自然に移る。
 - 前に相手が話した内容を覚えておき、後で触れる（例：「さっき言ってた〇〇はどうなりました？」）。
 - ユーザーが「${TOPIC_REQUEST}」と言ったら、今までと違う楽しい話題を自分から提案して質問する。
+- 読み上げ用の自然な話し言葉で書く。絵文字・顔文字・「ㅋㅋ」「ㅎㅎ」・「~」などの記号・かっこ書きは使わない。読点（,）や「아,」「음,」などで自然な間やあいづちを入れる。
 - 人物設定の年齢・性格らしい話し方をする。ただし学習者向けに、標準語の해요体を中心にする。
 - レベル: ${LEVELS[state.level]?.rule || LEVELS.mid.rule} 読み上げて聞き取る練習なので長くしすぎない。
 ${profileForPrompt()}
@@ -590,7 +603,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
-  let state = Object.assign({ char: "mina", voice: "", level: "mid", memoryOn: true, scene: "free", rate: 0.9, cap: "on", showJa: true, turns: [] }, store.get("mina-app", {}));
+  let state = Object.assign({ char: "mina", voice: "", mode: "live", tts: "ai", aiVoice: "", level: "mid", memoryOn: true, scene: "free", rate: 0.9, cap: "on", showJa: true, turns: [] }, store.get("mina-app", {}));
   let apiKey = store.get("mina-key", "");
   let model = store.get("mina-model", "gemini-3.5-flash-lite");
   const save = () => store.set("mina-app", state);
@@ -622,13 +635,17 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
   const voiceGender = (v) => FEMALE_RE.test(v.name) ? "f" : MALE_RE.test(v.name) ? "m" : "?";
   const quality = (v) => (/premium|enhanced|고급|プレミアム|拡張/i.test(v.name) ? 2 : 0) + (v.localService ? 1 : 0);
   function loadVoices() {
-    if (!synth) return;
-    koVoices = synth.getVoices().filter(v => /^ko/i.test(v.lang));
-    const sel = $("voice"), cur = state.voice;
+    if (synth) koVoices = synth.getVoices().filter(v => /^ko/i.test(v.lang));
+    const sel = $("voice");
     sel.textContent = "";
     sel.append(new Option("おまかせ（相手に合わせる）", ""));
-    for (const v of koVoices) sel.append(new Option(`${v.name}${voiceGender(v) === "m" ? "（男性）" : voiceGender(v) === "f" ? "（女性）" : ""}`, v.name));
-    sel.value = koVoices.some(v => v.name === cur) ? cur : "";
+    if (state.tts === "ai") {
+      for (const [name, desc, g] of AI_VOICES) sel.append(new Option(`${name}（${g === "f" ? "女性" : "男性"}・${desc}）`, name));
+      sel.value = AI_VOICES.some(v => v[0] === state.aiVoice) ? state.aiVoice : "";
+    } else {
+      for (const v of koVoices) sel.append(new Option(`${v.name}${voiceGender(v) === "m" ? "（男性）" : voiceGender(v) === "f" ? "（女性）" : ""}`, v.name));
+      sel.value = koVoices.some(v => v.name === state.voice) ? state.voice : "";
+    }
     voiceHint();
   }
   function currentVoice() {
@@ -641,16 +658,18 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     return { v: any, fallback: !!any && want === "m" };
   }
   function voiceHint() {
+    if (state.tts === "ai" && !ttsDown) { showNotice(""); return; }
     if (!synth) return;
     if (!koVoices.length) { showNotice("韓国語の読み上げ音声が見つかりません。Macは「システム設定 > アクセシビリティ > 読み上げコンテンツ > システムの声 > 声を管理」、iPhoneは「設定 > アクセシビリティ > 読み上げコンテンツ > 声 > 韓国語」で追加してください。"); return; }
     if (currentVoice().fallback) showNotice("この端末に韓国語の男性の声がないため、女性の声を低くして代用しています。男性の声（Minsuなど）は、Macは「システム設定 > アクセシビリティ > 読み上げコンテンツ > システムの声 > 声を管理 > 韓国語」、iPhoneは「設定 > アクセシビリティ > 読み上げコンテンツ > 声 > 韓国語」から追加できます。");
     else showNotice("");
   }
-  if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; setTimeout(loadVoices, 1200); }
+  if (synth) { synth.onvoiceschanged = loadVoices; }
+  setTimeout(loadVoices, 0); setTimeout(loadVoices, 1200);
 
   let speakingEl = null;
   function clearSpeaking() { if (speakingEl) speakingEl.querySelectorAll(".now").forEach(w => w.classList.remove("now")); speakingEl = null; }
-  function speak(text, koEl, rate) {
+  function speakDevice(text, koEl, rate) {
     return new Promise((resolve) => {
       if (!synth || !text) return resolve();
       synth.cancel(); clearSpeaking();
@@ -674,6 +693,139 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
       // Safari sometimes never fires onend
       const guard = setInterval(() => { if (!synth.speaking && !synth.pending) { clearInterval(guard); fin(); } }, 400);
     });
+  }
+
+  // ---------- AI voice (Gemini TTS): natural, fluent Korean speech; falls back to the device voice
+  const TTS_MODELS = ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts", "gemini-3.1-flash-tts-preview"];
+  const AI_VOICES = [
+    ["Leda", "若々しい", "f"], ["Aoede", "さわやか", "f"], ["Zephyr", "明るい", "f"], ["Laomedeia", "元気", "f"], ["Callirrhoe", "おおらか", "f"],
+    ["Despina", "なめらか", "f"], ["Achernar", "やわらか", "f"], ["Vindemiatrix", "やさしい", "f"], ["Sulafat", "あたたかい", "f"], ["Kore", "しっかり", "f"], ["Gacrux", "落ち着いた大人", "f"],
+    ["Puck", "アップビート", "m"], ["Achird", "フレンドリー", "m"], ["Zubenelgenubi", "カジュアル", "m"], ["Umbriel", "おおらか", "m"], ["Iapetus", "はっきり", "m"],
+    ["Algieba", "なめらか", "m"], ["Charon", "知的", "m"], ["Sadaltager", "物知り", "m"], ["Algenib", "渋い", "m"], ["Orus", "しっかり", "m"],
+  ];
+  const AI_CHAR = {
+    mina:      { voice: "Leda",         style: "a cheerful, friendly Korean woman in her twenties chatting with a friend, warm and natural" },
+    junho:     { voice: "Puck",         style: "an easygoing, friendly Korean man in his early twenties, relaxed and natural" },
+    soyeon:    { voice: "Vindemiatrix", style: "a kind Korean woman in her thirties who is a language teacher, calm, clear and warm" },
+    sangcheol: { voice: "Sadaltager",   style: "a caring Korean man in his fifties, a company manager, calm and slightly low voice" },
+    halmoni:   { voice: "Gacrux",       style: "a warm, gentle Korean grandmother in her seventies, speaking kindly" },
+  };
+  let ttsDown = false, ttsNoted = false, audioCtx = null, curSrc = null, hlTimer = null, ttsModelIx = 0;
+  const ttsCache = new Map();
+  function ensureCtx() {
+    if (!audioCtx) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; audioCtx = new C(); }
+    if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+    return audioCtx;
+  }
+  // iPhone only lets audio start from a tap: wake the audio context on every tap
+  document.addEventListener("pointerdown", () => { if (state.tts === "ai") ensureCtx(); }, true);
+  const aiVoice = () => state.aiVoice || (AI_CHAR[state.char] || AI_CHAR.mina).voice;
+  function paceStyle(rate) {
+    const r = (rate || state.rate) * ch().rate;
+    const pace = r <= 0.65 ? "speaking slowly and very clearly, syllable by syllable, like a teacher for learners"
+      : r < 0.88 ? "speaking a little slowly and clearly for a language learner"
+      : r > 1.1 ? "speaking at a lively, slightly fast natural pace" : "speaking at a natural conversational pace";
+    return `${(AI_CHAR[state.char] || AI_CHAR.mina).style}; ${pace}; native Seoul Korean pronunciation`;
+  }
+  const cleanForSpeech = (t) => String(t || "")
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "")
+    .replace(/[ㅋㅎㅠㅜ]{2,}/g, "").replace(/[~～♡♥☆★]+/g, "").replace(/\([^)]*\)|（[^）]*）/g, "")
+    .replace(/\s{2,}/g, " ").trim();
+  const b64ToBytes = (b64) => { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
+  async function bytesToBuffer(bytes) {
+    const ctx = ensureCtx();
+    const isWav = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
+    if (isWav) return await ctx.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    const n = bytes.length >> 1, dv = new DataView(bytes.buffer, bytes.byteOffset, n * 2), buf = ctx.createBuffer(1, n, 24000), ch0 = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) ch0[i] = dv.getInt16(i * 2, true) / 32768;
+    return buf;
+  }
+  async function fetchTts(text, style, voice) {
+    for (; ttsModelIx < TTS_MODELS.length; ttsModelIx++) {
+      const model = TTS_MODELS[ttsModelIx];
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+        method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({ model, input: [{ type: "user_input", content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style }] }] }],
+          response_format: { type: "audio" }, generation_config: { speech_config: [{ voice }] } }),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        const audio = (j.steps || []).filter(st => st.type === "model_output").flatMap(st => st.content || []).filter(c => c.type === "audio").pop();
+        if (audio?.data) return b64ToBytes(audio.data);
+        throw Object.assign(new Error("no audio"), { status: 0 });
+      }
+      if (res.status === 404) continue; // model not available for this key → try the next one
+      if (res.status === 400) {
+        // older API shape: generateContent with audio output
+        const r2 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({ contents: [{ parts: [{ text: `Say as ${style}: ${text}` }] }],
+            generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } } }),
+        });
+        if (r2.ok) {
+          const j = await r2.json();
+          const part = (j.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.data);
+          if (part) return b64ToBytes(part.inlineData.data);
+        }
+        if (r2.status === 404) continue;
+        throw Object.assign(new Error("tts"), { status: r2.status || 400 });
+      }
+      throw Object.assign(new Error("tts"), { status: res.status });
+    }
+    throw Object.assign(new Error("no tts model"), { status: 404 });
+  }
+  function getTtsBuffer(text, rate) {
+    const style = paceStyle(rate), voice = aiVoice(), key = voice + "|" + style + "|" + text;
+    if (!ttsCache.has(key)) {
+      const p = fetchTts(text, style, voice).then(bytesToBuffer);
+      p.catch(() => ttsCache.delete(key));
+      ttsCache.set(key, p);
+      if (ttsCache.size > 60) ttsCache.delete(ttsCache.keys().next().value);
+    }
+    return ttsCache.get(key);
+  }
+  function prefetchSpeech(text) { if (state.tts === "ai" && !ttsDown && apiKey && text) getTtsBuffer(cleanForSpeech(text)).catch(() => {}); }
+  function stopSpeech() {
+    if (synth) synth.cancel();
+    if (curSrc) { const s = curSrc; curSrc = null; try { s.onended && s.onended(); s.onended = null; s.stop(); } catch {} }
+    clearInterval(hlTimer); clearSpeaking();
+  }
+  async function speakAI(text, koEl, rate) {
+    const buf = await getTtsBuffer(text, rate);
+    const ctx = ensureCtx();
+    if (!ctx || ctx.state !== "running") await ctx?.resume().catch(() => {});
+    if (!ctx || ctx.state !== "running") throw Object.assign(new Error("audio locked"), { status: 0 });
+    stopSpeech();
+    return new Promise((resolve) => {
+      const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
+      curSrc = src; speakingEl = koEl;
+      const words = koEl ? [...koEl.querySelectorAll(".w")] : [];
+      const total = words.reduce((n, w) => n + w.textContent.length, 0) || 1, t0 = ctx.currentTime + 0.05;
+      clearInterval(hlTimer);
+      if (words.length) hlTimer = setInterval(() => {
+        const pos = Math.max(0, (ctx.currentTime - t0) / buf.duration) * total; let acc = 0, cur = words[words.length - 1];
+        for (const w of words) { acc += w.textContent.length; if (acc >= pos) { cur = w; break; } }
+        words.forEach(w => w.classList.toggle("now", w === cur));
+      }, 90);
+      let done = false;
+      const fin = () => { if (done) return; done = true; clearInterval(hlTimer); clearTimeout(safety); clearSpeaking(); if (curSrc === src) curSrc = null; resolve(); };
+      src.onended = fin;
+      // if the browser keeps audio suspended, don't let the conversation hang
+      const safety = setTimeout(fin, (buf.duration + 2) * 1000);
+      src.start(t0);
+    });
+  }
+  async function speak(text, koEl, rate) {
+    text = cleanForSpeech(text);
+    if (!text) return;
+    if (state.tts === "ai" && !ttsDown && apiKey) {
+      try { return await speakAI(text, koEl, rate); }
+      catch (e) {
+        if (e.status === 429 || e.status === 401 || e.status === 403 || e.status === 404) ttsDown = true;
+        if (!ttsNoted) { ttsNoted = true; showNotice(e.status === 429 ? "AI音声の無料枠の上限に達したので、しばらく端末の音声で読み上げるね" : "AI音声が使えなかったので、端末の音声で読み上げるね"); }
+      }
+    }
+    return speakDevice(text, koEl, rate);
   }
 
   // ---------- rendering
@@ -732,7 +884,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     app.classList.toggle("cap-off", state.cap === "off");
     app.classList.toggle("hide-ja", !state.showJa);
     document.querySelectorAll("[data-cap]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.cap === state.cap)));
-    $("char").value = state.char; $("scene").value = state.scene; $("level").value = state.level || "mid"; $("memoryOn").checked = state.memoryOn !== false; $("rate").value = state.rate; $("rateVal").textContent = Number(state.rate).toFixed(1) + "×";
+    $("char").value = state.char; $("scene").value = state.scene; $("level").value = state.level || "mid"; $("ttsEngine").value = state.tts || "ai"; $("convMode").value = state.mode || "live"; $("memoryOn").checked = state.memoryOn !== false; $("rate").value = state.rate; $("rateVal").textContent = Number(state.rate).toFixed(1) + "×";
     $("showJa").checked = state.showJa;
     $("avatar").textContent = ch().letter; $("pTitle").textContent = ch().title;
     $("pSub").innerHTML = `with <b>${ch().name}</b>・${$("scene").selectedOptions[0]?.text || ""}・${LEVELS[state.level]?.name || "中級"}　›`;
@@ -845,7 +997,8 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     scrollDown();
     ctl = new AbortController();
     try {
-      const raw = await askGemini((t) => { ai.set(parse(t)); if (state.cap !== "on") ai.ko.classList.remove("revealed"); scrollDown(); }, ctl.signal);
+      let prefetched = false;
+      const raw = await askGemini((t) => { const pp = parse(t); if (!prefetched && pp.ja && pp.ko) { prefetched = true; prefetchSpeech(pp.ko); } ai.set(pp); if (state.cap !== "on") ai.ko.classList.remove("revealed"); scrollDown(); }, ctl.signal);
       const p = parse(raw);
       ai.set(p);
       if (state.cap !== "on") ai.ko.classList.remove("revealed");
@@ -881,6 +1034,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     $("doneBtn").hidden = $("topicBtn").hidden = $("hintBtn").hidden = true;
   }
   async function replay(text, koEl, rate) {
+    if (liveOn()) { liveFlush(); liveMute(true); await say(text, koEl, rate); liveMute(false); liveStatus(); return; }
     if (ctl) return;
     cancelListen();
     await say(text, koEl, rate);
@@ -1012,7 +1166,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
   }, true);
 
   function speakPlain(text, rate) {
-    if (!synth || running) return Promise.resolve();
+    if (running) return Promise.resolve();
     return speak(text, null, rate);
   }
 
@@ -1046,7 +1200,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     }
   }
   $("vocBtn").addEventListener("click", () => { stop(); renderVocab(); $("vocab").hidden = false; });
-  $("vocClose").addEventListener("click", () => { synth?.cancel(); $("vocab").hidden = true; });
+  $("vocClose").addEventListener("click", () => { stopSpeech(); $("vocab").hidden = true; });
 
   // ---------- practice (listening / speaking) from the vocabulary
   let prac = { mode: "listen", target: "word", order: [], i: 0 };
@@ -1125,7 +1279,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
   }
   function practiceListen(text, v) {
     if (pracRec) { try { pracRec.stop(); } catch {} return; }
-    synth?.cancel();
+    stopSpeech();
     const btn = $("pSpeak"), heard = $("pHeard"), score = $("pScore");
     heard.textContent = "…"; score.textContent = ""; score.className = "prac-score";
     btn.textContent = "聞いてるよ…（タップで終了）";
@@ -1146,7 +1300,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
   }
   function closePractice() {
     if (pracRec) { try { pracRec.abort(); } catch {} pracRec = null; }
-    synth?.cancel();
+    stopSpeech();
     $("practice").hidden = true; renderVocab(); $("vocab").hidden = false;
   }
   $("pracListen").addEventListener("click", () => startPractice("listen"));
@@ -1156,8 +1310,9 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
 
   // ---------- "change the topic" button
   $("topicBtn").addEventListener("click", () => {
+    if (liveOn()) { liveSendText(TOPIC_REQUEST, "（話題チェンジ）"); return; }
     if (ctl || !running) return;
-    cancelListen(); synth?.cancel();
+    cancelListen(); stopSpeech();
     reply(TOPIC_REQUEST, meMessage("（話題チェンジ）", ""));
   });
 
@@ -1202,7 +1357,8 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
   async function shadow(wrap) {
     const text = wrap.dataset.ko;
     if (!text || ctl || onceRec) return;
-    cancelListen(); synth?.cancel();
+    const wasLive = liveOn(); if (wasLive) { liveFlush(); liveMute(true); }
+    cancelListen(); stopSpeech();
     let box = wrap.querySelector(".pron");
     if (!box) { box = document.createElement("div"); box.className = "pron"; wrap.append(box); }
     box.innerHTML = '<span class="pron-live">聞いてるよ… まねして言ってみて</span>';
@@ -1214,7 +1370,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     } catch (e) {
       box.innerHTML = `<span class="pron-live">${e.code === "denied" ? "マイクが許可されていません" : "マイクが使えませんでした"}</span>`;
     }
-    if (running) listen(); else idleStatus();
+    if (wasLive && liveOn()) { liveMute(false); liveStatus(); } else if (running) listen(); else idleStatus();
   }
 
   // ---------- hints: "what could I say?"
@@ -1229,7 +1385,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     return lines.join("\n");
   }
   async function showHint() {
-    if (ctl || !apiKey) return;
+    if ((ctl && !liveOn()) || !apiKey) return;
     const box = $("hintBox");
     box.hidden = false; box.innerHTML = '<p class="hint-note">言えそうな返事を考え中…</p>';
     try {
@@ -1253,6 +1409,7 @@ ${convoText(10)}`);
     }
   }
   async function playHint(text) {
+    if (liveOn()) { liveMute(true); await speak(text, null); liveMute(false); return; }
     const wasListening = !!rec;
     cancelListen();
     await speak(text, null);
@@ -1423,6 +1580,228 @@ ${convoText(12)}
   syncProfileUI();
   renderStreak();
 
+  // ---------- Real-time conversation (Gemini Live): voice in → voice out over a WebSocket
+  const LIVE_MODEL = "models/gemini-3.8-live";
+  let live = null, liveBroken = false, liveHandle = null;
+  const liveOn = () => !!(live && live.ready && running);
+  const CAPTURE_WORKLET = `
+    class Cap extends AudioWorkletProcessor {
+      constructor() { super(); this.ratio = sampleRate / 16000; this.acc = 0; this.cnt = 0; this.pos = 0; this.buf = new Int16Array(1600); this.n = 0; }
+      process(inputs) {
+        const ch = inputs[0] && inputs[0][0]; if (!ch) return true;
+        for (let i = 0; i < ch.length; i++) {
+          this.acc += ch[i]; this.cnt++; this.pos++;
+          if (this.pos >= this.ratio) {
+            this.pos -= this.ratio;
+            const v = Math.max(-1, Math.min(1, this.acc / this.cnt)); this.acc = 0; this.cnt = 0;
+            this.buf[this.n++] = v < 0 ? v * 0x8000 : v * 0x7fff;
+            if (this.n === this.buf.length) { this.port.postMessage(this.buf.slice(0)); this.n = 0; }
+          }
+        }
+        return true;
+      }
+    }
+    registerProcessor("cap16k", Cap);`;
+  const bytesToB64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+  function liveRules() {
+    const base = rules(state.scene).split("\n訂正:")[0];
+    const hist = state.turns.length ? `\n\nこれまでの会話（この続きから自然に話す）:\n${convoText(20)}` : "";
+    return `${base}
+- これは音声通話。韓国語だけで話す（日本語は話さない）。ユーザーが日本語で話したら、韓国語でどう言うかを短く教えてから、韓国語で会話を続ける。
+- ユーザーの韓国語に間違いがあっても、会話の流れを止めて長く説明しない（必要なら自然に言い直してあげる程度）。
+- 「（スタート）」と言われたら、会話の最初なら「${opener().ko}」と言う。続きなら前の話題に軽く触れて話しかける。${hist}`;
+  }
+  function liveStatus() {
+    if (!liveOn()) return;
+    if (live.speaking) setStatus("speaking", `${ch().name}が話してるよ（話しかけると止まるよ）`);
+    else setStatus("listening", "あなたの番だよ！いつでも話しかけてね");
+    $("hintBtn").hidden = $("topicBtn").hidden = false; $("doneBtn").hidden = true;
+    $("skipBtn").hidden = !live.speaking;
+  }
+  function liveMute(on) { if (live) live.muted = on; }
+  function liveFlush() {
+    if (!live) return;
+    for (const src of live.sources) { try { src.onended = null; src.stop(); } catch {} }
+    live.sources.clear(); live.nextAt = 0; live.speaking = false; liveStatus();
+  }
+  function livePlayChunk(b64) {
+    const ctx = ensureCtx(); if (!ctx) return;
+    const bytes = b64ToBytes(b64), n = bytes.length >> 1, dv = new DataView(bytes.buffer, bytes.byteOffset, n * 2);
+    const buf = ctx.createBuffer(1, n, 24000), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = dv.getInt16(i * 2, true) / 32768;
+    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
+    const at = Math.max(ctx.currentTime + 0.03, live.nextAt || 0);
+    src.start(at); live.nextAt = at + buf.duration; live.sources.add(src);
+    src.onended = () => { live?.sources.delete(src); if (live && !live.sources.size) { live.speaking = false; liveStatus(); } };
+    if (!live.speaking) { live.speaking = true; liveStatus(); }
+  }
+  function liveSend(obj) { if (live?.ws?.readyState === 1) live.ws.send(JSON.stringify(obj)); }
+  function liveSendText(text, shown) {
+    if (!liveOn()) return;
+    liveFinishTurn();
+    live.userText = text; live.userEl = meMessage(shown, ""); live.userTyped = true;
+    liveFlush(); scrollDown();
+    liveSend({ realtimeInput: { text } });
+  }
+  // A user utterance + the partner's reply make one turn: store it, then add the Japanese translation and tip.
+  function liveFinishTurn() {
+    if (!live) return;
+    const userText = (live.userText || "").trim(), aiText = (live.aiText || "").trim(), userEl = live.userEl, aiMsg = live.aiMsg;
+    live.userText = ""; live.aiText = ""; live.userEl = null; live.aiMsg = null; live.userTyped = false;
+    if (userEl) { const b = userEl.querySelector(".bubble"); b.classList.remove("live"); if (!userText) userEl.remove(); }
+    if (live.opening) { live.opening = false; if (aiMsg && aiMsg !== openerMsg && aiText) aiMsg.set({ ko: aiText, ja: "" }); return; }
+    if (userText) {
+      state.turns.push({ role: "user", content: userText });
+      if (userText !== TOPIC_REQUEST) { logDay(); if (userEl) scoreAgainstHints(userText, userEl); }
+      hideHints();
+    }
+    if (aiText && aiMsg) {
+      const turn = { role: "assistant", content: `KO: ${aiText}` };
+      state.turns.push(turn);
+      save(); saveHistory(); maybeLearnFacts(); setStartBtn();
+      liveTranslate(turn, aiMsg, userText !== TOPIC_REQUEST ? userText : "", userEl);
+    } else if (userText) { save(); }
+  }
+  async function liveTranslate(turn, aiMsg, userText, userEl) {
+    try {
+      const r = await askGeminiJSON(`韓国語会話の練習中です。次の2つを日本語で返してください。
+1. 相手（${ch().name}）の発言の自然な日本語訳
+2. 学習者の発言に文法の誤りや不自然な点があれば、短い日本語の指摘と自然な言い方の例（音声認識による分かち書きや綴りのズレは指摘しない。問題がなければ空文字。学習者が日本語で話した場合は韓国語での言い方）
+学習者のレベル: ${LEVELS[state.level]?.name || "中級"}
+学習者の発言: ${userText || "（なし）"}
+相手の発言: ${parse(turn.content).ko}
+次のJSONだけを返してください: {"ja":"訳","tip":"指摘（なければ空）"}`);
+      const ko = parse(turn.content).ko;
+      turn.content = `KO: ${ko}\nJA: ${String(r.ja || "")}` + (r.tip ? `\nTIP: ${String(r.tip)}` : "");
+      aiMsg.set(parse(turn.content));
+      if (state.cap !== "on" && !aiMsg.ko.classList.contains("revealed")) aiMsg.ko.classList.remove("revealed");
+      if (r.tip && userEl?.isConnected) userEl.append(tipBox(String(r.tip)));
+      save(); saveHistory();
+    } catch {}
+  }
+  async function handleLiveMessage(m) {
+    if (!live) return;
+    if (m.setupComplete) {
+      live.ready = true; live.tries = 0;
+      showNotice(""); liveStatus();
+      if (!live.started) {
+        live.started = true; live.opening = true; live.openingUsesOpener = state.turns.length === 0;
+        liveSend({ realtimeInput: { text: "（スタート）" } });
+      }
+      return;
+    }
+    if (m.sessionResumptionUpdate?.resumable && m.sessionResumptionUpdate.newHandle) liveHandle = m.sessionResumptionUpdate.newHandle;
+    if (m.goAway) { live.reconnect = true; }
+    const sc = m.serverContent; if (!sc) return;
+    if (sc.interrupted) { liveFlush(); }
+    if (sc.inputTranscription?.text && !live.userTyped) {
+      if (!live.userEl) {
+        live.userEl = meMessage("", ""); live.userEl.querySelector(".bubble").classList.add("live");
+        // the transcript can arrive after the reply has started: keep "me" above the reply
+        if (live.aiMsg && live.aiMsg !== openerMsg && live.aiMsg.wrap.isConnected) log.insertBefore(live.userEl, live.aiMsg.wrap);
+      }
+      live.userText = (live.userText || "") + sc.inputTranscription.text;
+      live.userEl.querySelector(".bubble").textContent = live.userText.trim();
+      scrollDown();
+    }
+    for (const p of sc.modelTurn?.parts || []) if (p.inlineData?.data && !live.muted) livePlayChunk(p.inlineData.data);
+    if (sc.outputTranscription?.text) {
+      if (!live.aiMsg) {
+        if (live.opening && live.openingUsesOpener && openerMsg) live.aiMsg = openerMsg;
+        else { live.aiMsg = aiMessage(); if (state.cap !== "on") live.aiMsg.ko.classList.remove("revealed"); }
+      }
+      live.aiText = (live.aiText || "") + sc.outputTranscription.text;
+      if (live.aiMsg !== openerMsg) live.aiMsg.set({ ko: live.aiText.trim(), ja: "" });
+      scrollDown();
+    }
+    if (sc.turnComplete) { liveFinishTurn(); liveStatus(); }
+  }
+  async function startLive() {
+    showNotice(""); hideHints();
+    running = true; setStartBtn();
+    setStatus("thinking", "リアルタイム会話につないでいます…");
+    const ctx = ensureCtx();
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+    } catch {
+      showNotice("マイクが許可されていません。ブラウザの設定（iPhoneは「設定 > アプリ > Safari > マイク」）で、このページのマイクを許可してね");
+      running = false; setStartBtn(); idleStatus(); return;
+    }
+    if (!running) { stream.getTracks().forEach(t => t.stop()); return; }
+    live = { ws: null, stream, node: null, ready: false, muted: false, speaking: false, sources: new Set(), nextAt: 0, userText: "", aiText: "", userEl: null, aiMsg: null, tries: 0 };
+    try {
+      if (!ctx.audioWorklet) throw new Error("no worklet");
+      const url = URL.createObjectURL(new Blob([CAPTURE_WORKLET], { type: "application/javascript" }));
+      await ctx.audioWorklet.addModule(url).catch(() => {});
+      const srcNode = ctx.createMediaStreamSource(stream), node = new AudioWorkletNode(ctx, "cap16k"), mute = ctx.createGain();
+      mute.gain.value = 0; srcNode.connect(node); node.connect(mute); mute.connect(ctx.destination);
+      node.port.onmessage = (e) => {
+        if (!live || !live.ready || live.muted) return;
+        liveSend({ realtimeInput: { audio: { data: bytesToB64(new Uint8Array(e.data.buffer)), mimeType: "audio/pcm;rate=16000" } } });
+      };
+      live.node = node; live.srcNode = srcNode;
+    } catch {
+      liveFallback("この端末ではリアルタイム会話が使えないみたい。ふつうのモードで続けるね"); return;
+    }
+    liveConnect();
+  }
+  function liveConnect() {
+    if (!live) return;
+    const ws = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(apiKey)}`);
+    live.ws = ws; live.ready = false; live.reconnect = false;
+    let queue = Promise.resolve();
+    const openTimer = setTimeout(() => { if (live && live.ws === ws && !live.ready) { try { ws.close(); } catch {} } }, 10000);
+    ws.onopen = () => {
+      const setup = {
+        model: LIVE_MODEL,
+        generationConfig: { responseModalities: ["AUDIO"], temperature: 0.9,
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: aiVoice() } } } },
+        systemInstruction: { parts: [{ text: liveRules() }] },
+        inputAudioTranscription: {}, outputAudioTranscription: {},
+        realtimeInputConfig: { automaticActivityDetection: { endOfSpeechSensitivity: "END_SENSITIVITY_LOW", silenceDurationMs: 900 } },
+        contextWindowCompression: { slidingWindow: {} },
+        sessionResumption: liveHandle ? { handle: liveHandle } : {},
+      };
+      ws.send(JSON.stringify({ setup }));
+    };
+    ws.onmessage = (e) => {
+      queue = queue.then(async () => {
+        const txt = typeof e.data === "string" ? e.data : await e.data.text();
+        try { await handleLiveMessage(JSON.parse(txt)); } catch {}
+      });
+    };
+    ws.onclose = (e) => {
+      clearTimeout(openTimer);
+      if (!live || live.ws !== ws) return;
+      const wasReady = live.ready; live.ready = false;
+      if (!running) return;
+      if ((wasReady || live.reconnect) && live.tries < 3) { live.tries++; setStatus("thinking", "つなぎ直しています…"); liveFinishTurn(); setTimeout(liveConnect, 400); return; }
+      liveHandle = null;
+      const why = /quota|exceed|429|resource/i.test(e.reason || "") ? "リアルタイム会話の無料枠の上限に達したので、ふつうのモードで続けるね"
+        : /key|auth|permission|403|401/i.test(e.reason || "") ? "APIキーでリアルタイム会話が使えなかったので、ふつうのモードで続けるね"
+        : "リアルタイム会話につながらなかったので、ふつうのモードで続けるね";
+      liveFallback(why + (e.reason ? `（${e.reason.slice(0, 80)}）` : ""));
+    };
+  }
+  function stopLive() {
+    if (!live) return;
+    const l = live; live = null;
+    try { if (l.ws?.readyState === 1) l.ws.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } })); } catch {}
+    try { l.ws?.close(); } catch {}
+    try { l.node?.disconnect(); l.srcNode?.disconnect(); } catch {}
+    l.stream?.getTracks().forEach(t => t.stop());
+    for (const src of l.sources) { try { src.stop(); } catch {} }
+    // keep whatever was said before stopping
+    live = l; liveFinishTurn(); live = null;
+  }
+  function liveFallback(msg) {
+    stopLive(); liveBroken = true;
+    showNotice(msg);
+    running = false; setStartBtn();
+    if (SR) start(); else idleStatus();
+  }
+
   // ---------- start / stop
   // keep the phone screen on during a conversation
   let wakeLock = null;
@@ -1442,7 +1821,9 @@ ${convoText(12)}
   }
   async function start() {
     if (!apiKey) { openSetup(); return; }
-    if (!SR) return;
+    if (state.tts === "ai" || state.mode === "live") ensureCtx();
+    if (state.mode === "live" && !liveBroken) { startLive(); return; }
+    if (!SR) { showNotice("このブラウザは音声認識に対応していません。Chrome か Safari で開いてね"); return; }
     showNotice("");
     running = true; emptyTries = 0; setStartBtn();
     if (synth && state.turns.length) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; synth.speak(u); } // iPhone: allow later speech
@@ -1455,9 +1836,10 @@ ${convoText(12)}
   }
   function stop() {
     running = false;
+    stopLive();
     cancelListen(); stopOnce(); hideHints();
     if (ctl) ctl.abort();
-    synth?.cancel();
+    stopSpeech();
     $("skipBtn").hidden = true; $("doneBtn").hidden = $("topicBtn").hidden = $("hintBtn").hidden = true;
     setStartBtn();
     setStatus("", "ひと休み中。「つづける」で再開できるよ");
@@ -1465,7 +1847,7 @@ ${convoText(12)}
   function pause() { running = false; $("skipBtn").hidden = true; $("doneBtn").hidden = $("topicBtn").hidden = $("hintBtn").hidden = true; setStartBtn(); }
 
   $("startBtn").addEventListener("click", () => running ? stop() : start());
-  $("skipBtn").addEventListener("click", () => synth?.cancel());
+  $("skipBtn").addEventListener("click", () => { stopSpeech(); liveFlush(); });
   $("doneBtn").addEventListener("click", () => { if (rec) try { rec.stop(); } catch {} });
   $("typeForm").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1473,7 +1855,8 @@ ${convoText(12)}
     if (!t || ctl) return;
     if (!apiKey) { openSetup(); return; }
     $("typeInput").value = "";
-    cancelListen(); synth?.cancel();
+    if (liveOn()) { liveSendText(t, t); return; }
+    cancelListen(); stopSpeech();
     if (!running) { running = true; setStartBtn(); }
     reply(t, meMessage(t, ""));
   });
@@ -1481,8 +1864,10 @@ ${convoText(12)}
   // ---------- settings
   function resetConv() { stop(); state.turns = []; state.session = null; $("reportBtn").hidden = true; save(); $("saved").hidden = true; renderAll(); setStartBtn(); setStatus("", "スタートを押して、おしゃべりしよう♡"); }
   $("scene").addEventListener("change", (e) => { state.scene = e.target.value; resetConv(); });
-  $("char").addEventListener("change", (e) => { state.char = e.target.value; voiceHint(); resetConv(); applySettings(); });
-  $("voice").addEventListener("change", (e) => { state.voice = e.target.value; save(); voiceHint(); });
+  $("char").addEventListener("change", (e) => { state.char = e.target.value; loadVoices(); voiceHint(); resetConv(); applySettings(); });
+  $("voice").addEventListener("change", (e) => { if (state.tts === "ai") state.aiVoice = e.target.value; else state.voice = e.target.value; save(); voiceHint(); speakPlain(opener().ko); });
+  $("convMode").addEventListener("change", (e) => { state.mode = e.target.value; liveBroken = false; save(); });
+  $("ttsEngine").addEventListener("change", (e) => { state.tts = e.target.value; ttsDown = false; ttsNoted = false; save(); loadVoices(); });
   $("resetBtn").addEventListener("click", () => { resetConv(); $("settings").hidden = true; });
   const openSettings = () => { stop(); applySettings(); $("settings").hidden = false; };
   $("setBtn").addEventListener("click", openSettings);
