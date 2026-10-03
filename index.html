@@ -142,6 +142,24 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
 .compose input { flex: 1; min-width: 0; font-family: var(--font-ko); font-size: 16px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
 .compose button { border: 0; border-radius: 999px; padding: 8px 16px; background: var(--yellow); color: var(--on-yellow); font-weight: 700; font-size: .84rem; cursor: pointer; }
 
+/* ---------- bottom tab bar (HelloTalk-style) */
+:root { --tabbar-h: 60px; }
+.tabbar { flex: none; position: relative; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--paper); border-top: 1px solid var(--line); padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px)); }
+.tabbar button { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; min-height: 52px; font-size: .62rem; color: var(--muted); cursor: pointer; }
+.tabbar .ti { position: relative; width: 48px; height: 30px; border-radius: 15px; display: grid; place-items: center; transition: background .15s; }
+.tabbar button[aria-current="page"] { color: var(--ink); font-weight: 700; }
+.tabbar button[aria-current="page"] .ti { background: var(--yellow); color: var(--on-yellow); }
+.tab-badge { position: absolute; top: -3px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--danger); color: #fff; font-size: .6rem; font-weight: 700; line-height: 17px; text-align: center; }
+.setup { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)) !important; }
+.tabsheet .card > .top .icon-btn[id$="Close"] { display: none; }
+footer { padding-bottom: 8px !important; }
+.toast { bottom: calc(var(--tabbar-h) + 140px + env(safe-area-inset-bottom, 0px)) !important; }
+/* top bar: plain icons + scrollable scene tabs */
+.top-icon { width: 40px; height: 40px; display: grid; place-items: center; border: 0; background: none; color: var(--ink); border-radius: 50%; cursor: pointer; }
+.scene-tabs { display: flex; gap: 2px; overflow-x: auto; margin: 0 -16px; padding: 0 12px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.scene-tabs::-webkit-scrollbar { display: none; }
+.scene-tabs button { flex: none; border: 0; background: none; color: var(--muted); font-size: .84rem; padding: 7px 14px; min-height: 36px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.scene-tabs button[aria-pressed="true"] { background: var(--yellow-soft); color: var(--ink); font-weight: 700; }
 /* ---------- slide-in menu (right) */
 .drawer-bg { position: fixed; inset: 0; z-index: 40; background: rgba(60, 48, 30, .28); opacity: 0; pointer-events: none; transition: opacity .25s; }
 .drawer-bg.open { opacity: 1; pointer-events: auto; }
@@ -326,11 +344,13 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
         <span class="p-text"><span class="p-title" id="pTitle">미나랑 수다</span><span class="p-sub" id="pSub"></span></span>
       </button>
       <div class="top-right">
-      <button class="menu-btn" id="menuBtn" type="button" aria-label="メニュー" aria-expanded="false" aria-controls="menu">
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>
-      </button>
+        <button class="top-icon" id="reportTop" type="button" aria-label="ふりかえり"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg></button>
+        <button class="top-icon" id="newTop" type="button" aria-label="新しい会話"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
       </div>
     </div>
+    <nav class="scene-tabs" id="sceneTabs" aria-label="場面">
+      <button type="button" data-scene="free">フリートーク</button><button type="button" data-scene="cafe">カフェ</button><button type="button" data-scene="shop">買い物</button><button type="button" data-scene="travel">旅行</button><button type="button" data-scene="intro">自己紹介</button><button type="button" data-scene="fan">推し活</button>
+    </nav>
     <p class="notice" id="notice" hidden></p>
     <p class="saved" id="saved" hidden></p>
   </header>
@@ -368,25 +388,19 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
   </footer>
 </div>
 
-<div class="drawer-bg" id="drawerBg"></div>
-<aside class="drawer" id="menu" aria-label="メニュー">
-  <div class="drawer-head"><span class="brand">한국어 수다</span><button class="close-x" id="menuClose" type="button" aria-label="メニューを閉じる">×</button></div>
-  <nav>
-    <button type="button" id="vocBtn"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/><path d="M9 7h6"/></svg></span><strong>単語帳</strong><small>タップした単語の復習と練習</small></button>
-    <button type="button" id="reportNav"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M10 12h6M10 16h4"/></svg></span><strong>ふりかえり</strong><small>会話ごとのレポート（過去の分も）</small></button>
-    <button type="button" id="calNav"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></span><strong>記録カレンダー</strong><small id="calNavSub">連続記録と毎日の目標</small></button>
-    <button type="button" id="histBtn"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L4 20l1.4-4.4A7.5 7.5 0 1 1 20 12z"/></svg></span><strong>トーク履歴</strong><small>前の会話を見る・つづける</small></button>
-    <button type="button" id="setBtn"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span><strong>設定</strong><small>話す相手・声・場面・速さ</small></button>
-    <button type="button" id="newBtn"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z"/></svg></span><strong>新しい会話</strong><small>今の会話は履歴に残るよ</small></button>
-  </nav>
-  <p class="drawer-foot">매일 조금씩, 천천히 ☁︎</p>
-</aside>
+<nav class="tabbar" id="tabbar" aria-label="メイン">
+  <button type="button" data-tab="talk" aria-current="page"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.7 7.1L4 20l1.2-3.9A8 8 0 1 1 20 12z"/></svg></span>会話</button>
+  <button type="button" data-tab="vocab"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/><path d="M9 7h6"/></svg></span>単語帳</button>
+  <button type="button" data-tab="history"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>履歴</button>
+  <button type="button" data-tab="calendar"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><b class="tab-badge" id="calBadge" hidden></b></span>記録</button>
+  <button type="button" data-tab="settings"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></span>マイ</button>
+</nav>
 
 <div class="toast" id="toast" role="status" hidden><div class="t-body" id="toastBody"></div><button type="button" id="toastAct" hidden></button></div>
 
-<div class="setup" id="settings" hidden>
+<div class="setup tabsheet" id="settings" hidden>
   <div class="card">
-    <div class="top"><h2>設定</h2><button class="icon-btn" id="setClose" type="button">閉じる</button></div>
+    <div class="top"><h2>マイページ・設定</h2><button class="icon-btn" id="setClose" type="button">閉じる</button></div>
     <div class="form">
       <label>話す相手
         <select id="char">
@@ -461,7 +475,7 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
   </div>
 </div>
 
-<div class="setup" id="calendar" hidden>
+<div class="setup tabsheet" id="calendar" hidden>
   <div class="card">
     <div class="top"><h2>記録カレンダー</h2><button class="icon-btn" id="calClose" type="button">閉じる</button></div>
     <div class="cal-stats">
@@ -484,7 +498,7 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
   </div>
 </div>
 
-<div class="setup" id="vocab" hidden>
+<div class="setup tabsheet" id="vocab" hidden>
   <div class="card">
     <div class="top"><h2>単語帳 <span class="muted" id="vocCount"></span></h2><button class="icon-btn" id="vocClose" type="button">閉じる</button></div>
     <p class="muted">会話中に気になった単語をタップすると、ここに集まるよ。もう一度タップで意味チェック＆解除できます。</p>
@@ -511,7 +525,7 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
   </div>
 </div>
 
-<div class="setup" id="history" hidden>
+<div class="setup tabsheet" id="history" hidden>
   <div class="card">
     <div class="top"><h2>トーク履歴</h2><button class="icon-btn" id="histClose" type="button">閉じる</button></div>
     <p class="muted">タップするとその会話を開くよ。「つづける」で続きから話せます。</p>
@@ -902,6 +916,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     app.classList.toggle("cap-off", state.cap === "off");
     app.classList.toggle("hide-ja", !state.showJa);
     document.querySelectorAll("[data-cap]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.cap === state.cap)));
+    document.querySelectorAll("#sceneTabs [data-scene]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.scene === state.scene)));
     $("char").value = state.char; $("scene").value = state.scene; $("level").value = state.level || "mid"; $("ttsEngine").value = state.tts || "ai"; $("convMode").value = state.mode || "live"; $("memoryOn").checked = state.memoryOn !== false; $("rate").value = state.rate; $("rateVal").textContent = Number(state.rate).toFixed(1) + "×";
     $("showJa").checked = state.showJa;
     $("avatar").textContent = ch().letter; $("pTitle").textContent = ch().title;
@@ -1223,7 +1238,6 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
       list.append(li);
     }
   }
-  $("vocBtn").addEventListener("click", () => { stop(); renderVocab(); $("vocab").hidden = false; });
   $("vocClose").addEventListener("click", () => { stopSpeech(); $("vocab").hidden = true; });
 
   // ---------- practice (listening / speaking) from the vocabulary
@@ -1539,7 +1553,6 @@ ${convoText(40)}`);
     });
   }
   $("reportBtn").addEventListener("click", openReport);
-  $("reportNav").addEventListener("click", openReport);
   $("reportClose").addEventListener("click", () => { $("report").hidden = true; idleStatus(); });
 
   // ---------- streak calendar
@@ -1564,7 +1577,7 @@ ${convoText(40)}`);
   }
   function renderStreak() {
     const s = streakInfo();
-    $("calNavSub").textContent = s.cur ? `いま${s.cur}日連続・今日 ${s.today}/${goal}回` : "連続記録と毎日の目標";
+    $("calBadge").textContent = s.cur || ""; $("calBadge").hidden = !s.cur;
   }
   function renderCalendar() {
     const s = streakInfo();
@@ -1587,7 +1600,6 @@ ${convoText(40)}`);
     }
   }
   function openCalendar() { stop(); calMonth = new Date(); calMonth.setDate(1); renderCalendar(); $("calendar").hidden = false; }
-  $("calNav").addEventListener("click", openCalendar);
   $("calClose").addEventListener("click", () => { $("calendar").hidden = true; idleStatus(); });
   $("calPrev").addEventListener("click", () => { calMonth.setMonth(calMonth.getMonth() - 1); renderCalendar(); });
   $("calNext").addEventListener("click", () => { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendar(); });
@@ -1916,36 +1928,33 @@ ${convoText(12)}
   $("voice").addEventListener("change", (e) => { if (state.tts === "ai") state.aiVoice = e.target.value; else state.voice = e.target.value; save(); voiceHint(); speakPlain(opener().ko); });
   $("convMode").addEventListener("change", (e) => { state.mode = e.target.value; liveBroken = false; save(); });
   $("ttsEngine").addEventListener("change", (e) => { state.tts = e.target.value; ttsDown = false; ttsNoted = false; save(); loadVoices(); });
-  $("resetBtn").addEventListener("click", () => { resetConv(); $("settings").hidden = true; });
-  const openSettings = () => { stop(); applySettings(); $("settings").hidden = false; };
-  $("setBtn").addEventListener("click", openSettings);
-  // ☰ menu: slides in from the right
-  const menu = $("menu"), menuBtn = $("menuBtn"), drawerBg = $("drawerBg");
-  const setMenu = (open) => {
-    menu.classList.toggle("open", open); drawerBg.classList.toggle("open", open);
-    menuBtn.setAttribute("aria-expanded", String(open));
-    if (open) $("vocBtn").focus({ preventScroll: true });
-  };
-  menuBtn.addEventListener("click", () => setMenu(true));
-  $("menuClose").addEventListener("click", () => { setMenu(false); menuBtn.focus(); });
-  drawerBg.addEventListener("click", () => setMenu(false));
-  menu.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => setMenu(false)));
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menu.classList.contains("open")) { setMenu(false); menuBtn.focus(); } });
-  $("newBtn").addEventListener("click", resetConv);
-  // swipe the menu to the right to close it
-  let swipeX = null;
-  menu.addEventListener("touchstart", (e) => { swipeX = e.touches[0].clientX; }, { passive: true });
-  menu.addEventListener("touchmove", (e) => {
-    if (swipeX === null) return;
-    const dx = Math.max(0, e.touches[0].clientX - swipeX);
-    menu.style.transform = `translateX(${dx}px)`; menu.style.transition = "none";
-  }, { passive: true });
-  menu.addEventListener("touchend", (e) => {
-    if (swipeX === null) return;
-    const dx = e.changedTouches[0].clientX - swipeX; swipeX = null;
-    menu.style.transform = ""; menu.style.transition = "";
-    if (dx > 70) setMenu(false);
-  });
+  $("resetBtn").addEventListener("click", () => { resetConv(); showTab("talk"); });
+  let openSettings = () => { stop(); applySettings(); $("settings").hidden = false; };
+  // ---------- bottom tab bar
+  const TAB_SHEETS = ["vocab", "history", "calendar", "settings"];
+  function setActiveTab(name) { document.querySelectorAll("#tabbar [data-tab]").forEach(b => b.dataset.tab === name ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")); }
+  function showTab(name) {
+    if (name !== "talk") stop();
+    for (const id of TAB_SHEETS) $(id).hidden = true;
+    $("practice").hidden = true; $("report").hidden = true;
+    setActiveTab(name);
+    if (name === "vocab") { renderVocab(); $("vocab").hidden = false; }
+    else if (name === "history") openHistory();
+    else if (name === "calendar") openCalendar();
+    else if (name === "settings") { applySettings(); $("settings").hidden = false; }
+    const sheet = name !== "talk" && $(name); if (sheet) sheet.scrollTop = 0;
+    haptic();
+  }
+  document.querySelectorAll("#tabbar [data-tab]").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  openSettings = () => showTab("settings");
+  $("newTop").addEventListener("click", () => { resetConv(); haptic(); });
+  $("reportTop").addEventListener("click", openReport);
+  // scene tabs at the top switch the scene (a new conversation)
+  document.querySelectorAll("#sceneTabs [data-scene]").forEach(b => b.addEventListener("click", () => {
+    if (state.scene === b.dataset.scene) return;
+    state.scene = b.dataset.scene; resetConv(); applySettings(); haptic();
+    b.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }));
   // keyboard button: show/hide the text input
   $("kbdBtn").addEventListener("click", () => {
     const f = $("typeForm"), open = f.hidden;
@@ -1953,7 +1962,7 @@ ${convoText(12)}
     if (open) $("typeInput").focus();
   });
   $("jaToggle").addEventListener("click", () => { state.showJa = !state.showJa; applySettings(); save(); });
-  $("summary").addEventListener("click", openSettings);
+  $("summary").addEventListener("click", () => openSettings());
   $("setClose").addEventListener("click", () => { $("settings").hidden = true; });
   $("rate").addEventListener("input", (e) => { state.rate = +e.target.value; $("rateVal").textContent = state.rate.toFixed(1) + "×"; save(); });
   document.querySelectorAll("[data-cap]").forEach(b => b.addEventListener("click", () => {
@@ -2005,12 +2014,11 @@ ${convoText(12)}
       save(); applySettings(); renderAll(); setStartBtn();
       setStatus("", "「つづける」で、この会話の続きから話せるよ");
       $("saved").hidden = true;
-      $("history").hidden = true;
+      showTab("talk");
     } catch { showNotice("この会話を開けませんでした。"); }
   }
-  $("histBtn").addEventListener("click", openHistory);
   $("histClose").addEventListener("click", () => { $("history").hidden = true; });
-  $("histNew").addEventListener("click", () => { $("history").hidden = true; resetConv(); });
+  $("histNew").addEventListener("click", () => { resetConv(); showTab("talk"); });
   function openSetup() { $("keyInput").value = apiKey; $("model").value = model; $("keyErr").hidden = true; $("setup").hidden = false; $("keyInput").focus(); }
   $("keyBtn").addEventListener("click", () => { stop(); openSetup(); });
   $("keyCancel").addEventListener("click", () => { $("setup").hidden = true; });
