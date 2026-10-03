@@ -43,7 +43,7 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { height: 100%; margin: 0; }
+html, body { height: 100%; margin: 0; overscroll-behavior: none; }
 body {
   height: 100dvh; display: flex; flex-direction: column;
   padding: env(safe-area-inset-top, 0px) 0 0;
@@ -51,6 +51,9 @@ body {
   font-family: var(--font-ja); font-size: 14px; line-height: 1.65; letter-spacing: .01em;
 }
 button, select, summary, .ko .w { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button, .seg, .toggle, .who, .status, .partner { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+main { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+button:active:not(:disabled) { transform: scale(.96); transition: transform .08s; }
 button { font: inherit; color: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--yellow-deep); outline-offset: 2px; }
 select, input[type=range] { font: inherit; accent-color: var(--yellow-deep); }
@@ -68,7 +71,9 @@ header { padding: 10px 16px 8px; display: flex; flex-direction: column; gap: 8px
 .p-sub b { color: var(--ink); font-weight: 500; }
 .menu-btn { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
 
-.quick { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.quick { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.kbd-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); color: var(--muted); cursor: pointer; }
+.kbd-btn[aria-expanded="true"] { background: var(--yellow-soft); color: var(--ink); border-color: var(--yellow-deep); }
 .q-label { font-size: .7rem; color: var(--muted); }
 .seg { display: inline-flex; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
 .seg button { background: none; border: 0; border-radius: 999px; padding: 3px 11px; font-size: .74rem; color: var(--muted); cursor: pointer; }
@@ -162,6 +167,7 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
 .setup { position: fixed; inset: 0; z-index: 10; overflow-y: auto; background: var(--bg); padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(22px + env(safe-area-inset-bottom, 0px)); }
 .setup .card { max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 .setup .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.setup .card > .top { position: sticky; top: calc(-16px - env(safe-area-inset-top, 0px)); z-index: 2; background: var(--bg); padding-block: 10px; margin-top: -10px; }
 .setup h2 { font-family: var(--font-display); font-weight: 700; margin: 0; font-size: 1.5rem; }
 .setup ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; font-size: .86rem; }
 .setup p { font-size: .86rem; }
@@ -295,8 +301,19 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
   .msg { max-width: 90%; }
 }
 @media (pointer: coarse) {
-  .tools button { padding: 5px 11px; font-size: .72rem; }
-  .seg button { padding: 5px 11px; }
+  /* comfortable tap sizes on phones (Apple recommends ~44pt for primary controls) */
+  .tools button { min-height: 34px; padding: 6px 13px; font-size: .74rem; }
+  .seg button { min-height: 34px; padding: 6px 13px; font-size: .76rem; }
+  .toggle { min-height: 36px; padding: 4px 13px 4px 8px; }
+  .kbd-btn { width: 40px; height: 40px; }
+  .menu-btn { width: 44px; height: 44px; }
+  .icon-btn { min-height: 40px; padding: 8px 16px; }
+  .close-x { width: 40px; height: 40px; }
+  .mini { min-height: 34px; padding: 6px 13px; }
+  .dock .sub { min-height: 38px; padding: 8px 13px; font-size: .78rem; }
+  .drawer nav button { min-height: 60px; }
+  .hint-card { min-height: 52px; }
+  .hist-open { min-height: 56px; }
 }
 </style>
 </head>
@@ -314,13 +331,6 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
       </button>
       </div>
     </div>
-    <div class="quick">
-      <span class="q-label">字幕</span>
-      <span class="seg" role="group" aria-label="韓国語の字幕">
-        <button type="button" data-cap="on" aria-pressed="true">あり</button><button type="button" data-cap="blur" aria-pressed="false">ぼかし</button><button type="button" data-cap="off" aria-pressed="false">なし</button>
-      </span>
-      <button class="toggle" id="jaToggle" type="button" aria-pressed="true">和訳</button>
-    </div>
     <p class="notice" id="notice" hidden></p>
     <p class="saved" id="saved" hidden></p>
   </header>
@@ -329,6 +339,15 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
 
   <footer>
     <div class="hint-box" id="hintBox" hidden></div>
+    <div class="quick">
+      <span class="seg" role="group" aria-label="韓国語の字幕">
+        <button type="button" data-cap="on" aria-pressed="true">字幕あり</button><button type="button" data-cap="blur" aria-pressed="false">ぼかし</button><button type="button" data-cap="off" aria-pressed="false">なし</button>
+      </span>
+      <button class="toggle" id="jaToggle" type="button" aria-pressed="true">和訳</button>
+      <button class="kbd-btn" id="kbdBtn" type="button" aria-label="文字で入力する" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 10h.01M10.5 10h.01M14 10h.01M17 10h.01M8 14h8"/></svg>
+      </button>
+    </div>
     <div class="status" id="status"><span class="dot"></span><span id="statusText">スタートを押して、おしゃべりしよう♡</span></div>
     <div class="dock">
       <div class="dock-side left">
@@ -342,13 +361,10 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
         <button class="sub" id="reportBtn" type="button" hidden>ふりかえり</button>
       </div>
     </div>
-    <details class="typing">
-      <summary>文字で入力する</summary>
-      <form class="compose" id="typeForm">
+    <form class="compose" id="typeForm" hidden>
         <input id="typeInput" type="text" placeholder="한국어로 입력…（日本語でもOK）" autocomplete="off" enterkeyhint="send">
         <button type="submit">送信</button>
-      </form>
-    </details>
+    </form>
   </footer>
 </div>
 
@@ -935,7 +951,13 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
 
   // ---------- speech recognition
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) showNotice("このブラウザは音声認識に対応していません。Chrome または Safari で開いてください。");
+  // Inside the phone app (Capacitor) there is no browser speech recognition: the real-time mode does the listening.
+  const IS_APP = !!window.Capacitor?.isNativePlatform?.();
+  const haptic = (style = "LIGHT") => { try { window.Capacitor?.Plugins?.Haptics?.impact({ style }); } catch {} };
+  // in the app, pinch-zoom would only get in the way
+  if (IS_APP) document.querySelector('meta[name=viewport]')?.setAttribute("content", "width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover");
+  if (!SR && IS_APP) state.mode = "live";
+  else if (!SR && state.mode === "classic") showNotice("このブラウザは音声認識に対応していません。Chrome または Safari で開いてください。");
 
   let running = false, rec = null, liveMsg = null, silenceTimer = null, ctl = null, emptyTries = 0;
   const SILENCE_MS = 1600;
@@ -1150,7 +1172,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     const wrap = el.closest(".msg");
     const entry = { id: Date.now() + "_" + Math.random().toString(36).slice(2, 6), word, base: "", meaning: "調べています…", note: "",
       sentence: wrap?.dataset.ko || "", sentenceJa: wrap?.dataset.ja || "", added: new Date().toISOString().slice(0, 10), ok: 0, ng: 0 };
-    vocab.unshift(entry); saveVocab(); markWords();
+    vocab.unshift(entry); saveVocab(); markWords(); haptic();
     speakPlain(word);
     toast(`<span class="t-word">${esc(word)}</span> を単語帳に追加したよ♡<br>意味を調べ中…`, "やめる", () => { vocab = vocab.filter(v => v !== entry); saveVocab(); markWords(); });
     if (!apiKey) return;
@@ -1872,7 +1894,7 @@ ${convoText(12)}
   }
   function pause() { running = false; $("skipBtn").hidden = true; $("doneBtn").hidden = $("topicBtn").hidden = $("hintBtn").hidden = true; setStartBtn(); }
 
-  $("startBtn").addEventListener("click", () => running ? stop() : start());
+  $("startBtn").addEventListener("click", () => { haptic(running ? "LIGHT" : "MEDIUM"); running ? stop() : start(); });
   $("skipBtn").addEventListener("click", () => { stopSpeech(); liveFlush(); });
   $("doneBtn").addEventListener("click", () => { if (rec) try { rec.stop(); } catch {} });
   $("typeForm").addEventListener("submit", (e) => {
@@ -1910,6 +1932,26 @@ ${convoText(12)}
   menu.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => setMenu(false)));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menu.classList.contains("open")) { setMenu(false); menuBtn.focus(); } });
   $("newBtn").addEventListener("click", resetConv);
+  // swipe the menu to the right to close it
+  let swipeX = null;
+  menu.addEventListener("touchstart", (e) => { swipeX = e.touches[0].clientX; }, { passive: true });
+  menu.addEventListener("touchmove", (e) => {
+    if (swipeX === null) return;
+    const dx = Math.max(0, e.touches[0].clientX - swipeX);
+    menu.style.transform = `translateX(${dx}px)`; menu.style.transition = "none";
+  }, { passive: true });
+  menu.addEventListener("touchend", (e) => {
+    if (swipeX === null) return;
+    const dx = e.changedTouches[0].clientX - swipeX; swipeX = null;
+    menu.style.transform = ""; menu.style.transition = "";
+    if (dx > 70) setMenu(false);
+  });
+  // keyboard button: show/hide the text input
+  $("kbdBtn").addEventListener("click", () => {
+    const f = $("typeForm"), open = f.hidden;
+    f.hidden = !open; $("kbdBtn").setAttribute("aria-expanded", String(open));
+    if (open) $("typeInput").focus();
+  });
   $("jaToggle").addEventListener("click", () => { state.showJa = !state.showJa; applySettings(); save(); });
   $("summary").addEventListener("click", openSettings);
   $("setClose").addEventListener("click", () => { $("settings").hidden = true; });
