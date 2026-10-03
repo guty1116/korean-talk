@@ -143,12 +143,16 @@ details.typing summary { font-size: .7rem; color: var(--muted); cursor: pointer;
 .compose button { border: 0; border-radius: 999px; padding: 8px 16px; background: var(--yellow); color: var(--on-yellow); font-weight: 700; font-size: .84rem; cursor: pointer; }
 
 /* ---------- bottom tab bar (HelloTalk-style) */
-:root { --tabbar-h: 60px; }
+:root { --tabbar-h: 60px; --tab-active: #A8740F; }
+@media (prefers-color-scheme: dark) { :root { --tab-active: #F2D675; } }
 .tabbar { flex: none; position: relative; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--paper); border-top: 1px solid var(--line); padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px)); }
 .tabbar button { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; min-height: 52px; font-size: .62rem; color: var(--muted); cursor: pointer; }
 .tabbar .ti { position: relative; width: 48px; height: 30px; border-radius: 15px; display: grid; place-items: center; transition: background .15s; }
-.tabbar button[aria-current="page"] { color: var(--ink); font-weight: 700; }
-.tabbar button[aria-current="page"] .ti { background: var(--yellow); color: var(--on-yellow); }
+.tabbar button[aria-current="page"] { color: var(--tab-active); font-weight: 700; }
+/* Talk sits in the middle as a raised yellow button */
+.tabbar button.talk .ti { width: 54px; height: 54px; margin-top: -24px; border-radius: 50%; background: var(--yellow); color: var(--on-yellow); border: 4px solid var(--paper); box-shadow: 0 4px 12px rgba(176, 125, 18, .28); }
+.tabbar button.talk .ti svg { width: 26px; height: 26px; }
+.tabbar button.talk[aria-current="page"] .ti { color: var(--ink); }
 .tab-badge { position: absolute; top: -3px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--danger); color: #fff; font-size: .6rem; font-weight: 700; line-height: 17px; text-align: center; }
 .setup { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)) !important; }
 .tabsheet .card > .top .icon-btn[id$="Close"] { display: none; }
@@ -312,6 +316,15 @@ footer { padding-bottom: 8px !important; }
 .cal-grid .d.some { background: var(--yellow-soft); color: var(--ink); }
 .cal-grid .d.full { background: var(--yellow); color: var(--on-yellow); font-weight: 700; }
 .cal-grid .d.today { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.cal-grid button.d { border: 0; font: inherit; cursor: pointer; padding: 0; background: transparent; color: var(--muted); }
+.cal-grid .d.sel { outline: 2px solid var(--tab-active); outline-offset: 1px; }
+.cal-day { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.cal-day h3 { margin: 0; font-size: .86rem; }
+.cal-day .muted { font-size: .76rem; }
+.day-item { border-top: 1px dashed var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.day-item:first-of-type { border-top: 0; padding-top: 0; }
+.day-meta { font-size: .7rem; color: var(--muted); }
+.day-sum { font-size: .84rem; }
 
 .form textarea { font-family: var(--font-ja); font-size: 16px; line-height: 1.5; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); resize: vertical; }
 
@@ -319,20 +332,22 @@ footer { padding-bottom: 8px !important; }
   .msg { max-width: 90%; }
 }
 @media (pointer: coarse) {
-  /* comfortable tap sizes on phones (Apple recommends ~44pt for primary controls) */
-  .tools button { min-height: 34px; padding: 6px 13px; font-size: .74rem; }
-  .seg button { min-height: 34px; padding: 6px 13px; font-size: .76rem; }
-  .toggle { min-height: 36px; padding: 4px 13px 4px 8px; }
-  .kbd-btn { width: 40px; height: 40px; }
-  .menu-btn { width: 44px; height: 44px; }
-  .icon-btn { min-height: 40px; padding: 8px 16px; }
-  .close-x { width: 40px; height: 40px; }
-  .mini { min-height: 34px; padding: 6px 13px; }
-  .dock .sub { min-height: 38px; padding: 8px 13px; font-size: .78rem; }
-  .drawer nav button { min-height: 60px; }
-  .hint-card { min-height: 52px; }
-  .hist-open { min-height: 56px; }
+  /* comfortable but compact tap sizes on phones */
+  .tools button { min-height: 28px; padding: 3px 10px; font-size: .68rem; }
+  .seg button { min-height: 30px; padding: 4px 11px; font-size: .72rem; }
+  .toggle { min-height: 30px; padding: 3px 11px 3px 7px; font-size: .72rem; }
+  .kbd-btn { width: 34px; height: 34px; }
+  .icon-btn { min-height: 34px; padding: 6px 13px; }
+  .close-x { width: 36px; height: 36px; }
+  .mini { min-height: 28px; padding: 3px 10px; }
+  .dock .sub { min-height: 32px; padding: 5px 11px; font-size: .72rem; }
+  .hint-card { min-height: 46px; }
+  .hist-open { min-height: 52px; }
 }
+#startBtn { min-height: 46px; font-size: 1.15rem; padding: 8px 26px; }
+.setup .row .big { padding: 9px 18px; font-size: .84rem; box-shadow: 0 2px 0 var(--yellow-deep); }
+.voc .tools button { font-size: .66rem; }
+
 </style>
 </head>
 <body>
@@ -389,11 +404,11 @@ footer { padding-bottom: 8px !important; }
 </div>
 
 <nav class="tabbar" id="tabbar" aria-label="メイン">
-  <button type="button" data-tab="talk" aria-current="page"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.7 7.1L4 20l1.2-3.9A8 8 0 1 1 20 12z"/></svg></span>会話</button>
-  <button type="button" data-tab="vocab"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/><path d="M9 7h6"/></svg></span>単語帳</button>
-  <button type="button" data-tab="history"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>履歴</button>
-  <button type="button" data-tab="calendar"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><b class="tab-badge" id="calBadge" hidden></b></span>記録</button>
-  <button type="button" data-tab="settings"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></span>マイ</button>
+  <button type="button" data-tab="vocab"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/><path d="M9 7h6"/></svg></span>Words</button>
+  <button type="button" data-tab="history"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>History</button>
+  <button type="button" data-tab="talk" class="talk" aria-current="page"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.7 7.1L4 20l1.2-3.9A8 8 0 1 1 20 12z"/></svg></span>Talk</button>
+  <button type="button" data-tab="calendar"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><b class="tab-badge" id="calBadge" hidden></b></span>Record</button>
+  <button type="button" data-tab="settings"><span class="ti"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></span>Me</button>
 </nav>
 
 <div class="toast" id="toast" role="status" hidden><div class="t-body" id="toastBody"></div><button type="button" id="toastAct" hidden></button></div>
@@ -494,6 +509,7 @@ footer { padding-bottom: 8px !important; }
       <div class="cal-head"><button type="button" id="calPrev" aria-label="前の月">‹</button><b id="calTitle"></b><button type="button" id="calNext" aria-label="次の月">›</button></div>
       <div class="cal-grid" id="calGrid"></div>
     </div>
+    <div class="cal-day" id="calDay"></div>
     <p class="muted">会話で話す・まねして言う・単語練習をすると、その日に記録がつくよ。目標を達成した日は黄色でぬりつぶされます。</p>
   </div>
 </div>
@@ -1145,7 +1161,20 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
   const cleanWord = (w) => w.replace(/[^가-힣ㄱ-ㆎ0-9A-Za-z]/g, "");
   let vocab = store.get("mina-vocab", []);
   const saveVocab = () => store.set("mina-vocab", vocab);
-  const findVocab = (w) => vocab.find(v => v.word === w);
+  // An entry is keyed by its dictionary form (word); the forms seen in conversation are kept in forms[].
+  function migrateVocab() {
+    const out = [];
+    for (const v of vocab) {
+      v.forms = v.forms || [v.surface || v.word];
+      v.surface = v.surface || v.forms[0];
+      if (v.base && v.base !== v.word) v.word = v.base;
+      const same = out.find(x => x.word === v.word);
+      if (same) { for (const f of v.forms) if (!same.forms.includes(f)) same.forms.push(f); } else out.push(v);
+    }
+    vocab = out;
+  }
+  migrateVocab(); saveVocab();
+  const findVocab = (w) => vocab.find(v => v.word === w || (v.forms || []).includes(w));
   function markWords(root) {
     (root || document).querySelectorAll(".ai .ko .w, .ko .w").forEach(el => el.classList.toggle("marked", !!findVocab(cleanWord(el.textContent))));
   }
@@ -1161,10 +1190,18 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
   }
   async function lookup(entry) {
     try {
-      const r = await askGeminiJSON(`韓国語の文「${entry.sentence}」に出てくる「${entry.word}」について、日本人の韓国語学習者向けに説明してください。
+      const r = await askGeminiJSON(`韓国語の文「${entry.sentence}」に出てくる「${entry.surface || entry.word}」について、日本人の韓国語学習者向けに説明してください。
 次のJSONだけを返してください:
-{"base": "辞書形（動詞・形容詞は原形、名詞は助詞を除いた形）", "meaning": "この文での意味（日本語で短く）", "note": "活用・助詞・使い方の説明（日本語で1文。不要なら空文字）"}`);
-      entry.base = String(r.base || ""); entry.meaning = String(r.meaning || "（意味を取得できませんでした）"); entry.note = String(r.note || "");
+{"base": "辞書形（動詞・形容詞は「-다」で終わる原形。例: 갔어요→가다、좋아해요→좋아하다。名詞は助詞を除いた形。例: 노래를→노래）", "meaning": "この文での意味（日本語で短く）", "note": "活用・助詞・使い方の説明（日本語で1文。不要なら空文字）"}`);
+      const base = cleanWord(String(r.base || "")) || entry.surface || entry.word;
+      entry.base = base; entry.meaning = String(r.meaning || "（意味を取得できませんでした）"); entry.note = String(r.note || "");
+      // the same word in another form is already in the book → merge into it
+      const other = vocab.find(v => v !== entry && v.word === base);
+      if (other) {
+        for (const f of entry.forms || []) if (!other.forms.includes(f)) other.forms.push(f);
+        vocab = vocab.filter(v => v !== entry);
+        entry.mergedInto = other;
+      } else entry.word = base;
     } catch (e) {
       entry.meaning = e.status === 429 ? "（上限のため取得できませんでした。単語帳で「意味を調べ直す」を押してください）" : "（意味を取得できませんでした。単語帳で「意味を調べ直す」を押してください）";
       entry.failed = true;
@@ -1178,21 +1215,24 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     if (!word) return;
     const exist = findVocab(word);
     if (exist) {
-      speakPlain(word);
-      toast(`<span class="t-word">${esc(word)}</span>${exist.base && exist.base !== word ? `（${esc(exist.base)}）` : ""}<br>${esc(exist.meaning)}`, "単語帳から外す", () => {
+      speakPlain(exist.word);
+      toast(`<span class="t-word">${esc(exist.word)}</span>${exist.word !== word ? `（${esc(word)}）` : ""}<br>${esc(exist.meaning)}`, "単語帳から外す", () => {
         vocab = vocab.filter(v => v !== exist); saveVocab(); markWords();
       });
       return;
     }
     const wrap = el.closest(".msg");
-    const entry = { id: Date.now() + "_" + Math.random().toString(36).slice(2, 6), word, base: "", meaning: "調べています…", note: "",
+    const entry = { id: Date.now() + "_" + Math.random().toString(36).slice(2, 6), word, surface: word, forms: [word], base: "", meaning: "調べています…", note: "",
       sentence: wrap?.dataset.ko || "", sentenceJa: wrap?.dataset.ja || "", added: new Date().toISOString().slice(0, 10), ok: 0, ng: 0 };
     vocab.unshift(entry); saveVocab(); markWords(); haptic();
     speakPlain(word);
     toast(`<span class="t-word">${esc(word)}</span> を単語帳に追加したよ♡<br>意味を調べ中…`, "やめる", () => { vocab = vocab.filter(v => v !== entry); saveVocab(); markWords(); });
     if (!apiKey) return;
     await lookup(entry);
-    if (findVocab(word)) toast(`<span class="t-word">${esc(word)}</span>${entry.base && entry.base !== word ? `（${esc(entry.base)}）` : ""}<br>${esc(entry.meaning)}`, "やめる", () => { vocab = vocab.filter(v => v !== entry); saveVocab(); markWords(); }, 6000);
+    saveVocab(); markWords();
+    const shown = entry.mergedInto || entry;
+    if (entry.mergedInto) toast(`<span class="t-word">${esc(shown.word)}</span>（${esc(word)}）はもう単語帳にあるよ<br>${esc(shown.meaning)}`, "", null, 5000);
+    else if (findVocab(word)) toast(`<span class="t-word">${esc(entry.word)}</span>${entry.word !== word ? `（${esc(word)}）` : ""}<br>${esc(entry.meaning)}`, "やめる", () => { vocab = vocab.filter(v => v !== entry); saveVocab(); markWords(); }, 6000);
   }
   // capture phase: the first tap on a hidden subtitle only reveals it; after that, taps mark words
   log.addEventListener("click", (e) => {
@@ -1221,9 +1261,9 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
     $("pracListen").disabled = $("pracSpeak").disabled = vocab.length === 0;
     for (const v of vocab) {
       const li = document.createElement("li"); li.className = "voc";
-      li.innerHTML = `<div class="voc-head"><span class="voc-word">${esc(v.word)}</span>${v.base && v.base !== v.word ? `<span class="voc-base">原形 ${esc(v.base)}</span>` : ""}<span class="voc-mean">${esc(v.meaning)}</span></div>
+      li.innerHTML = `<div class="voc-head"><span class="voc-word">${esc(v.word)}</span>${(v.forms || []).some(f => f !== v.word) ? `<span class="voc-base">会話では ${esc((v.forms || []).filter(f => f !== v.word).join("・"))}</span>` : ""}<span class="voc-mean">${esc(v.meaning)}</span></div>
         ${v.note ? `<p class="voc-note">${esc(v.note)}</p>` : ""}
-        ${v.sentence ? `<p class="voc-ex">${highlight(v.sentence, v.word)}</p><p class="voc-exja">${esc(v.sentenceJa || "")}</p>` : ""}
+        ${v.sentence ? `<p class="voc-ex">${highlight(v.sentence, v.surface || v.word)}</p><p class="voc-exja">${esc(v.sentenceJa || "")}</p>` : ""}
         <div class="tools"><button type="button" data-a="w">▶ 単語</button>${v.sentence ? `<button type="button" data-a="s">▶ 例文</button><button type="button" data-a="slow">ゆっくり</button>` : ""}${v.failed ? `<button type="button" data-a="re">意味を調べ直す</button>` : ""}<button type="button" data-a="del">削除</button></div>
         <span class="voc-stat">登録 ${esc(v.added || "")}　練習 ○${v.ok || 0} ×${v.ng || 0}</span>`;
       li.querySelector("[data-a=w]").onclick = () => speakPlain(v.word);
@@ -1287,7 +1327,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
       box.innerHTML = `${count}<p class="prac-sub">聞いて、意味を思い浮かべてみて</p>
         <div class="row"><button class="big" type="button" id="pPlay">▶ 聞く</button><button class="sub" type="button" id="pSlow">ゆっくり</button></div>
         <div class="hidden-answer" id="pAns" hidden>
-          <p class="prac-target ${isSent ? "small" : ""}">${isSent ? highlight(text, v.word) : esc(text)}</p>
+          <p class="prac-target ${isSent ? "small" : ""}">${isSent ? highlight(text, v.surface || v.word) : esc(text)}</p>
           <p class="prac-sub">${esc(v.word)}：${esc(v.meaning)}</p>
           ${isSent ? `<p class="prac-sub">${esc(v.sentenceJa || "")}</p>` : ""}
         </div>
@@ -1300,7 +1340,7 @@ TIP: 訂正やアドバイス（必要な時だけ）`;
       $("pNg").onclick = () => nextCard("ng");
       if (autoplay) speak(text, null);
     } else {
-      box.innerHTML = `${count}<p class="prac-target ${isSent ? "small" : ""}">${isSent ? highlight(text, v.word) : esc(text)}</p>
+      box.innerHTML = `${count}<p class="prac-target ${isSent ? "small" : ""}">${isSent ? highlight(text, v.surface || v.word) : esc(text)}</p>
         <p class="prac-sub">${esc(v.meaning)}${isSent && v.sentenceJa ? `<br>${esc(v.sentenceJa)}` : ""}</p>
         <div class="row"><button class="sub" type="button" id="pPlay">▶ お手本を聞く</button><button class="sub" type="button" id="pSlow">ゆっくり</button></div>
         <button class="big" type="button" id="pSpeak">話してみる</button>
@@ -1483,7 +1523,7 @@ ${convoText(10)}`);
  "good":["よかった点（日本語、1〜3個）"],
  "fixes":[{"you":"わたしが言った文","better":"より自然な韓国語","why":"理由（日本語で短く）"}],
  "phrases":[{"ko":"この会話で覚えると役立つ表現","ja":"訳"}],
- "words":[{"word":"覚えたい単語","meaning":"意味"}],
+ "words":[{"word":"覚えたい単語（辞書形。動詞・形容詞は-다の原形、名詞は助詞なし）","meaning":"意味"}],
  "next":"次回のおすすめ目標（日本語1文）",
  "facts":["会話から分かった、わたしについての情報（日本語で短く。なければ空）"]}
 fixesは本当に直した方がよいものだけ（0〜4個）。phrasesは3〜5個、wordsは3〜6個。
@@ -1525,7 +1565,7 @@ ${convoText(40)}`);
   const dots = (n) => { n = Math.max(0, Math.min(5, Math.round(+n || 0))); return "●".repeat(n) + "○".repeat(5 - n); };
   function addVocabFrom(word, meaning, sentence, sentenceJa) {
     if (findVocab(word)) return;
-    vocab.unshift({ id: Date.now() + "_" + Math.random().toString(36).slice(2, 6), word, base: "", meaning, note: "", sentence: sentence || "", sentenceJa: sentenceJa || "", added: today(), ok: 0, ng: 0 });
+    vocab.unshift({ id: Date.now() + "_" + Math.random().toString(36).slice(2, 6), word, surface: word, forms: [word], base: "", meaning, note: "", sentence: sentence || "", sentenceJa: sentenceJa || "", added: today(), ok: 0, ng: 0 });
     saveVocab(); markWords();
   }
   function renderReport(r, label) {
@@ -1584,6 +1624,7 @@ ${convoText(40)}`);
     $("stCur").textContent = s.cur; $("stBest").textContent = s.best; $("stTotal").textContent = s.total;
     $("goalText").textContent = s.today >= goal ? `${s.today} / ${goal}回　達成！잘했어요` : `${s.today} / ${goal}回`;
     $("goalBar").style.width = Math.min(100, s.today / goal * 100) + "%";
+    renderCalDay();
     $("goalSel").value = String(goal);
     const y = calMonth.getFullYear(), m = calMonth.getMonth();
     $("calTitle").textContent = `${y}年${m + 1}月`;
@@ -1593,13 +1634,41 @@ ${convoText(40)}`);
     for (let i = 0; i < first; i++) grid.append(document.createElement("span"));
     for (let dd = 1; dd <= n; dd++) {
       const k = `${y}-${pad(m + 1)}-${pad(dd)}`, c = days[k] || 0;
-      const e = document.createElement("span");
-      e.className = "d" + (c >= goal ? " full" : c > 0 ? " some" : "") + (k === t ? " today" : "");
-      e.textContent = dd; e.title = c ? `${c}回` : "";
+      const e = document.createElement("button"); e.type = "button";
+      e.className = "d" + (c >= goal ? " full" : c > 0 ? " some" : "") + (k === t ? " today" : "") + (k === calSel ? " sel" : "");
+      e.textContent = dd; e.setAttribute("aria-label", `${m + 1}月${dd}日${c ? `（${c}回）` : ""}`);
+      e.onclick = () => { calSel = k; renderCalendar(); };
       grid.append(e);
     }
   }
-  function openCalendar() { stop(); calMonth = new Date(); calMonth.setDate(1); renderCalendar(); $("calendar").hidden = false; }
+  let calSel = null;
+  async function renderCalDay() {
+    const box = $("calDay"), k = calSel || today();
+    const [y, m, d] = k.split("-").map(Number);
+    box.innerHTML = `<h3>${m}月${d}日の会話</h3><p class="muted">読み込み中…</p>`;
+    let items = [];
+    try { items = (await (await hist()).list()).filter(it => String(it.id).startsWith(k)); } catch {}
+    if ((calSel || today()) !== k) return;
+    if (!items.length) { box.innerHTML = `<h3>${m}月${d}日の会話</h3><p class="muted">この日の会話はありません${days[k] ? "（単語練習などの記録だけあります）" : ""}</p>`; return; }
+    box.innerHTML = `<h3>${m}月${d}日の会話（${items.length}件）</h3>`;
+    for (const it of items) {
+      const div = document.createElement("div"); div.className = "day-item";
+      const time = String(it.started || "").slice(11, 16);
+      div.innerHTML = `<span class="day-meta">${esc(time)}　${esc((CHARS[it.char] || CHARS.mina).name)}・${esc(SCENE_NAME[it.scene] || "")}・${it.count}往復</span>
+        <span class="day-sum">${esc(it.summary || it.preview || "")}</span>
+        <div class="row"><button class="mini" type="button" data-a="rep">${it.hasReport ? "ふりかえりを見る" : "ふりかえりを作る"}</button><button class="mini" type="button" data-a="open">会話を開く</button></div>`;
+      div.querySelector("[data-a=rep]").onclick = async () => {
+        if (it.hasReport) {
+          const d2 = await (await hist()).get(it.id);
+          $("report").hidden = false; renderPastReports();
+          renderReport(d2.report, `${d2.started}・${(CHARS[d2.char] || CHARS.mina).name}との会話`); $("report").scrollTop = 0;
+        } else { await loadSession(it.id); openReport(); }
+      };
+      div.querySelector("[data-a=open]").onclick = () => loadSession(it.id);
+      box.append(div);
+    }
+  }
+  function openCalendar() { stop(); calMonth = new Date(); calMonth.setDate(1); calSel = today(); renderCalendar(); $("calendar").hidden = false; }
   $("calClose").addEventListener("click", () => { $("calendar").hidden = true; idleStatus(); });
   $("calPrev").addEventListener("click", () => { calMonth.setMonth(calMonth.getMonth() - 1); renderCalendar(); });
   $("calNext").addEventListener("click", () => { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendar(); });
